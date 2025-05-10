@@ -22,36 +22,46 @@ This project implements an RF remote control system for Quiet Cool fans using an
 ## Software Requirements
 
 - PlatformIO
-- Arduino Framework
-- SmartRC-CC1101-Driver-Lib
 
-## Project Structure
-
-```
-.
-├── arduino/
-│   ├── src/
-│   │   └── main.ino      # Main firmware code
-│   ├── include/          # Header files
-│   ├── lib/             # Custom libraries
-│   └── platformio.ini   # PlatformIO configuration
-├── LICENSE
-└── README.md
-```
 
 ## Features
 
 - Controls Quiet Cool fan system via RF signals
-- Supports multiple fan speeds:
-  - High speed (1, 2, 4, 8, 12)
-  - Medium speed (1, 2, 4, 8, 12)
-  - Low speed (1, 2, 4, 8, 12)
-- On/Off control for each speed setting
-- Pre-programmed RF codes for all fan operations
+- Supports multiple fan speeds and timer durations
+  - Speed
+    - L
+    - M
+    - H
+  - Duration
+    - 1
+    - 2
+    - 4
+    - 8
+    - 12
+    - off
+    - on
+
+# Reverse Engineering
+I used an RTL-SDR.COM SDR like this:
+![RTL-SDR v3](images/rtl-sdrv3-500.jpg)
+
+And for software, I used Universal Radio Haacker.  Here's a recording of all the signals as they progress from H 1 2 4 8 12 ON OFF -> to medium -> low.  It was recorded with these settings
+
+![Settings](images/record-settings.png)
+
+[Download the raw recording](recordings/RTL-SDR-20250510_080358-433_92MHz-1MSps-1MHz.complex16s.gz)
+
+![Here's the signal demodulated](images/urh-demodulated.png)
+
+![Spectrum Analysis](images/spectrum.png)
+
+## Modulation
+This remote uses FSK modulation at 433.92MHz.  The CC1101 RF module ended up transmitting high, so I reduced the frequency in the code to 433.897 to make it work.  If things don't work, check the actual frequency. 
+
 
 ## Configuration
 
-The system operates at 433.897 MHz and uses ASK modulation. The CC1101 module is configured for:
+The system operates at 433.897 MHz and uses FSK modulation. The CC1101 module is configured for:
 - Direct mode transmission
 - No packet handling
 - Raw data mode
@@ -59,18 +69,11 @@ The system operates at 433.897 MHz and uses ASK modulation. The CC1101 module is
 
 ## Building and Uploading
 
-1. Install PlatformIO
-2. Clone this repository
-3. Open the project in PlatformIO
-4. Build and upload to your ESP32
+```pio run --target upload```
 
-## Usage
-
-The firmware automatically sends control signals for the fan system. The code includes pre-programmed RF codes for all fan operations, which can be modified in the `speed_settings` array.
 
 ## License
-
-This project is licensed under the terms included in the LICENSE file.
+MIT License
 
 ## Contributing
 
