@@ -19,18 +19,20 @@ namespace esphome {
 	    }
 
 	    this->qc_->begin();
+	    ESP_LOGD(TAG, "QuietCool initialized");
 	}
 
 	fan::FanTraits EmptyFan::get_traits() {
-	    return fan::FanTraits(this->oscillating_ != nullptr, false, this->direction_ != nullptr, 0);
+	    return fan::FanTraits(this->oscillating_ != nullptr, true, this->direction_ != nullptr, 3);
 	}
 
 	void EmptyFan::control(const fan::FanCall &call) {
-	    ESP_LOGD(TAG, "Control called: incoming state=%s, oscillating=%s, direction=%s", 
-                call.get_state().has_value() ? (*call.get_state() ? "ON" : "OFF") : "<unchanged>",
-                call.get_oscillating().has_value() ? (*call.get_oscillating() ? "ON" : "OFF") : "<unchanged>",
-                call.get_direction().has_value() ? (*call.get_direction() == fan::FanDirection::FORWARD ? "FORWARD" : "REVERSE") : "<unchanged>");
-
+	    float inc_speed = call.get_speed().value_or(-1.0f);
+	    ESP_LOGD(TAG, "Control called: state=%s, oscillating=%s, direction=%s, speed=%s", 
+		     call.get_state().has_value() ? (*call.get_state() ? "ON" : "OFF") : "<unchanged>",
+		     call.get_oscillating().has_value() ? (*call.get_oscillating() ? "ON" : "OFF") : "<unchanged>",
+		     call.get_direction().has_value() ? (*call.get_direction() == fan::FanDirection::FORWARD ? "FORWARD" : "REVERSE") : "<unchanged>",
+		     call.get_speed().has_value() ? (std::to_string(inc_speed)).c_str() : "<unchanged>");
 	    bool old_state = this->state;
 	    if (call.get_state().has_value())
 		this->state = *call.get_state();
@@ -39,14 +41,21 @@ namespace esphome {
 	    if (call.get_direction().has_value())
 		this->direction = *call.get_direction();
 
-	    if (old_state != this->state) {
-		ESP_LOGD(TAG, "Power state changed -> %s", this->state ? "ON" : "OFF");
-		this->send_power_command_(this->state);
+	    QuietCoolSpeed qcspd = QUIETCOOL_SPEED_OFF;
+	    if (call.get_speed().has_value()) {
+		this->speed_ = *call.get_speed();
+		if (this->speed_ < 0.5) qcspd = QUIETCOOL_SPEED_OFF;
+		else if (this->speed_ < 1.5) qcspd = QUIETCOOL_SPEED_LOW;
+		else if (this->speed_ < 2.5) qcspd = QUIETCOOL_SPEED_MEDIUM;
+		else if (this->speed_ < 3.5) qcspd = QUIETCOOL_SPEED_HIGH;
 	    }
+	    if (this->qc_) this->qc_->send(qcspd, QUIETCOOL_DURATION_1H);
 
-	    ESP_LOGV(TAG, "Post-update internal state: state=%s oscillating=%s direction=%s", 
+
+	    ESP_LOGV(TAG, "Post-update internal state: state=%s oscillating=%s direction=%s, speed=%s", 
               (this->state ? "ON" : "OFF"), (this->oscillating ? "ON" : "OFF"),
-              this->direction == fan::FanDirection::FORWARD ? "FORWARD" : "REVERSE");
+              this->direction == fan::FanDirection::FORWARD ? "FORWARD" : "REVERSE",
+			  (std::to_string(this->speed_)).c_str());
 
 	    this->write_state_();
 	    this->publish_state();

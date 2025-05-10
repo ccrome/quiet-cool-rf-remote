@@ -165,7 +165,6 @@ const char* QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration durati
 }
 
 void QuietCool::begin() {
-    static const char *TAG = "quietcool";
     ESP_LOGD(TAG, "gdo0_pin = %d, gdo2_pin = %d\n", gdo0_pin, gdo2_pin);
     pinMode(gdo0_pin, OUTPUT);
     pinMode(gdo2_pin, OUTPUT);
@@ -181,7 +180,9 @@ void QuietCool::begin() {
 }
 
 void QuietCool::send(QuietCoolSpeed speed, QuietCoolDuration duration) {
+    ESP_LOGI(TAG, "send(%d, %d)", speed, duration);
     const char* cmd = getCommand(speed, duration);
+    ESP_LOGI(TAG, "%s", cmd);
     if (cmd)
         sendPacket(cmd, strlen(cmd)-1);
 }

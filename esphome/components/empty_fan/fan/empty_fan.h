@@ -42,6 +42,7 @@ namespace esphome {
 	    uint8_t csn_pin_{};
 	    uint8_t gdo0_pin_{};
 	    uint8_t gdo2_pin_{};
+	    float speed_{0.0f};
 	    bool pins_set_{false};
 	};
 
