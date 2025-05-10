@@ -9,6 +9,10 @@ from esphome.const import (
 )
 from .. import empty_fan_ns
 
+# Additional pin configuration keys
+CONF_GDO0_PIN = "gdo0_pin"
+CONF_GDO2_PIN = "gdo2_pin"
+
 DEPENDENCIES = ["spi"]
 
 EmptyFan = empty_fan_ns.class_("EmptyFan", cg.Component, fan.Fan, spi.SPIDevice)
@@ -19,6 +23,8 @@ CONFIG_SCHEMA = fan.FAN_SCHEMA.extend(
         cv.Required(CONF_OUTPUT): cv.use_id(output.BinaryOutput),
         cv.Optional(CONF_DIRECTION_OUTPUT): cv.use_id(output.BinaryOutput),
         cv.Optional(CONF_OSCILLATION_OUTPUT): cv.use_id(output.BinaryOutput),
+        cv.Required(CONF_GDO0_PIN): cv.uint8_t,
+        cv.Required(CONF_GDO2_PIN): cv.uint8_t,
     }
 ).extend(cv.COMPONENT_SCHEMA).extend(spi.spi_device_schema(cs_pin_required=True))
 
@@ -39,3 +45,6 @@ async def to_code(config):
     if direction_output_id := config.get(CONF_DIRECTION_OUTPUT):
         direction_output = await cg.get_variable(direction_output_id)
         cg.add(var.set_direction(direction_output))
+
+    cs_num = config[spi.CONF_CS_PIN]["number"]
+    cg.add(var.set_pins(cs_num, config[CONF_GDO0_PIN], config[CONF_GDO2_PIN]))

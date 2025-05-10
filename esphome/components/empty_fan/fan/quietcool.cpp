@@ -38,12 +38,22 @@ QuietCool::QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8
 
 // --- Initialize CC1101 and verify communication ---
 bool QuietCool::initCC1101() {
+    ESP_LOGD(TAG, "sck:%d, miso:%d, mosi:%d, csn:%d\n", sck_pin, miso_pin, mosi_pin, csn_pin);
     ELECHOUSE_cc1101.setSpiPin(sck_pin, miso_pin, mosi_pin, csn_pin);
-    uint8_t version = readChipVersion();
-    ESP_LOGI(TAG, "CC1101 VERSION: 0x%02X", version);
-    if (!(version == 0x14 || version == 0x04)) {
-        ESP_LOGE(TAG, "CC1101 not detected");
-        return false;
+    int tries = 10;
+    bool detected = false;
+    while (tries--) {
+	uint8_t version = readChipVersion();
+	ESP_LOGI(TAG, "CC1101 VERSION READ: 0x%02X", version);
+	if (version == 0x14 || version == 0x04) {
+	    ESP_LOGI(TAG, "CC1101 detected!");
+	    detected = true;
+	    break;
+	}
+    }
+    if (!detected) {
+	ESP_LOGE(TAG, "CC1101 not detected!");
+	return false;
     }
     if (!ELECHOUSE_cc1101.getCC1101()) {
         ESP_LOGE(TAG, "CC1101 connection error");
@@ -155,6 +165,8 @@ const char* QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration durati
 }
 
 void QuietCool::begin() {
+    static const char *TAG = "quietcool";
+    ESP_LOGD(TAG, "gdo0_pin = %d, gdo2_pin = %d\n", gdo0_pin, gdo2_pin);
     pinMode(gdo0_pin, OUTPUT);
     pinMode(gdo2_pin, OUTPUT);
     digitalWrite(gdo0_pin, LOW);

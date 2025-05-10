@@ -47,6 +47,8 @@ fan:
     name: Empty fan
     output: gpio_d1
     cs_pin: 15
+    gdo0_pin: 13
+    gdo2_pin: 12
 
 output:
   - platform: gpio
