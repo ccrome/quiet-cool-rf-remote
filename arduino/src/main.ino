@@ -1,4 +1,6 @@
-#include <ELECHOUSE_CC1101_SRC_DRV.h>
+#include <Arduino.h>
+#include "quietcool.h"
+
 /*
   hdr   cc1101
   1      19  GND
@@ -10,56 +12,6 @@
   7      2   MISO
   8      3   GDO2
 */
-#define SEND_PACKET(x) sendPacket(x, strlen(x))
-
-typedef enum {
-    PRE,
-    H1,
-    H2,
-    H4,
-    H8,
-    H12,
-    HON,
-    HOFF,
-    M1,
-    M2,
-    M4,
-    M8,
-    M12,
-    MON,
-    MOFF,
-    L1,
-    L2,
-    L4,
-    L8,
-    L12,
-    LON,
-    LOFF,
-} Speeds;
-const char *speed_settings[] = {
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100100110011001100110000", // PRE
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101011000110110001000", // H1
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101011001010110010000", // H2
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101011010010110100000", // H4
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101011100010111000000", // H8
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101011110010111100000", // H12
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101011111110111111000", // HON
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101011000010110000000", // HOFF
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101010000110100001000", // M1
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101010001010100010000", // M2
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101010010010100100000", // M4
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101010100010101000000", // M8
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101010110010101100000", // M12
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101010111110101111000", // MON
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101010000010100000000", // MOFF
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101001000110010001000", // L1
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101001001010010010000", // L2
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101001010010010100000", // L4
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101001100010011000000", // L8
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101001110010011100000", // L12
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101001111110011111000", // LON
-    "0000101011010101010101010101010101010101010101010101010101010101010101010001011011101010000000110110010110000000011110111111100101001000010010000000", // LOFF
-};
 
 // --- Pin configuration ---
 #define CSN_PIN   15
@@ -71,131 +23,23 @@ const char *speed_settings[] = {
 // #define FREQ_MHZ  433.92
 #define FREQ_MHZ  433.897
 
-// --- Function declarations ---
-bool initCC1101();
-byte readChipVersion();
-void sendRawData(const byte* data, byte len);
-
-// --- Initialize CC1101 and verify communication ---
-bool initCC1101() {
-    ELECHOUSE_cc1101.setSpiPin(SCK_PIN, MISO_PIN, MOSI_PIN, CSN_PIN);
-    byte version = readChipVersion();
-    Serial.print("[INFO] CC1101 VERSION register: 0x");
-    Serial.println(version, HEX);
-    if (version == 0x14 || version == 0x04) {
-        Serial.println("[INFO] CC1101 detected.");
-    } else {
-        Serial.println("[INFO] CC1101 NOT detected.");
-        while(1);
-    }
-    if (ELECHOUSE_cc1101.getCC1101()){        // Check the CC1101 Spi connection.
-        Serial.println("Connection OK");
-    }else{
-        Serial.println("Connection Error");
-        while(1);
-    }
-    ELECHOUSE_cc1101.Init();
-
-    // Basic configuration
-    ELECHOUSE_cc1101.setMHZ(FREQ_MHZ);        // Set frequency first
-    ELECHOUSE_cc1101.setPA(0);                // Start with low power
-
-    // Configure for direct mode transmission
-    ELECHOUSE_cc1101.setCCMode(1);            // Continuous mode
-    ELECHOUSE_cc1101.setModulation(0);        // ASK modulation
-    ELECHOUSE_cc1101.setDeviation(10);        // Frequency deviation
-    ELECHOUSE_cc1101.setDRate(2.398);         // Data rate in kBaud
-
-    // Disable all packet handling
-    ELECHOUSE_cc1101.setSyncMode(0);          // No sync word
-    ELECHOUSE_cc1101.setWhiteData(false);     // No whitening
-    ELECHOUSE_cc1101.setManchester(false);    // No Manchester encoding
-    ELECHOUSE_cc1101.setPktFormat(3);         // Raw data mode
-    ELECHOUSE_cc1101.setCrc(0);               // No CRC
-    ELECHOUSE_cc1101.setLengthConfig(0);      // Fixed length
-    ELECHOUSE_cc1101.setPacketLength(0);      // No packet length
-    ELECHOUSE_cc1101.setPRE(0);               // No preamble
-
-    // Configure GDO pins for direct mode
-    Serial.println("Before SetGDO");
-    ELECHOUSE_cc1101.setGDO(GDO0_PIN, GDO2_PIN);  // Set both GDO pins
-    Serial.println("After SetGDO");
-    delay(500);
-
-    return true;
-}
-
-// --- Send raw data ---
-
-#define TO_BIT(c) ((c=='1') ? 1 : 0)
-void sendPacket(const char *data, byte len) {
-    for (int i = 0; i < 3; i++) {
-	sendRawData(data, len);
-	delay(18);
-    }
-}
-
-void sendBits(const char *data, byte len) {
-    for (int bit = 0; bit < len; bit++) {
-	digitalWrite(GDO0_PIN, TO_BIT(data[bit]));
-	delayMicroseconds(415);  // Adjust timing as needed
-    }
-}
-
-void sendRawData(const char* data, byte len) {
-    if (len == 0) {
-        Serial.println("[ERROR] No data to send");
-        return;
-    }
-
-    Serial.printf("Sending %d bits\n", len);
-
-    const char *preamble = "00";
-    digitalWrite(GDO0_PIN, 0);
-    noInterrupts();
-    ELECHOUSE_cc1101.SetTx();
-    sendBits(preamble, strlen(preamble));
-    sendBits(data, len);
-    ELECHOUSE_cc1101.setSidle();
-    interrupts();
-
-    delay(10);  // Give CC1101 time to enter IDLE mode
-}
-
-// --- Read VERSION register ---
-byte readChipVersion() {
-    return ELECHOUSE_cc1101.SpiReadReg(0xF1);
-}
+// Create QuietCool instance with pin configuration
+QuietCool qc(CSN_PIN, GDO0_PIN, GDO2_PIN, SCK_PIN, MISO_PIN, MOSI_PIN);
 
 // --- Arduino setup ---
 void setup() {
     Serial.begin(115200);
     delay(1000);
-
-    // Initialize GDO pins as outputs for direct mode
-    pinMode(GDO0_PIN, OUTPUT);
-    pinMode(GDO2_PIN, OUTPUT);
-    digitalWrite(GDO0_PIN, LOW);
-    digitalWrite(GDO2_PIN, LOW);
-
-    Serial.println("[BOOT] Starting CC1101 TX setup...");
-    while (!initCC1101()) {
-        Serial.println("[ERROR] CC1101 not detected. Halting.");
-        while (true);  // Halt
-    }
-    Serial.println("[BOOT] CC1101 TX setup complete");
+    qc.begin();
 }
 
 void loop() {
-    // Example of sending raw data
-    Serial.print("Sending preamble...");
-    sendPacket(speed_settings[PRE], strlen(speed_settings[PRE])-1);
-    Serial.println("Done");
-    delay(2000);
-    Serial.print("Sending OFF...");
-    sendPacket(speed_settings[HOFF], strlen(speed_settings[HOFF])-1);
-    Serial.println("Done");
-    Serial.println("Waiting 20 seconds");
-    delay(20000);
+    // Example: Send a command to turn on high speed for 1 hour
+    qc.send(QUIETCOOL_SPEED_HIGH, QUIETCOOL_DURATION_1H);
+    delay(20000);  // Wait 5 seconds
+
+    // Example: Turn off the fan
+    qc.send(QUIETCOOL_SPEED_OFF, QUIETCOOL_DURATION_1H);
+    delay(20000);  // Wait 5 seconds
 }
 
