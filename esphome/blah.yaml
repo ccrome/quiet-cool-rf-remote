@@ -1,0 +1,54 @@
+esphome:
+  name: blah
+  friendly_name: blah
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "Kd4zZONOhEY1vvzFmUN0zLo/DDQAAKq9QypkK7O7i+E="
+
+ota:
+  - platform: esphome
+    password: "6f8924365bd2d87c9f8905f1f601bb53"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Blah Fallback Hotspot"
+    password: "iifozSf0C018"
+
+captive_portal:
+
+# SPI bus configuration (adjust pins as needed for your hardware)
+spi:
+  clk_pin: 18
+  mosi_pin: 23
+  miso_pin: 19
+
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [empty_fan]
+
+fan:
+  - platform: empty_fan
+    name: Empty fan
+    output: gpio_d1
+    cs_pin: 15
+
+output:
+  - platform: gpio
+    pin: 14
+    id: gpio_d1
