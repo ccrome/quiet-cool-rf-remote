@@ -7,36 +7,129 @@ namespace quiet_cool {
 
 static const char *TAG = "quietcool";
 
-#define SYNC "_00010101_10101010_10101010_10101010_10101010_10101010_10101010_10101010_10101010"
+const uint8_t SYNC[] = {0x15, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa};
+const uint8_t REMOTE_ID[] = {0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2};
+#define SYNC_LEN (sizeof(SYNC))
+#define REMOTE_ID_LEN (sizeof(REMOTE_ID))
 
-// original ->         000101101110101000000011011001011000000001111011111110010 
-#define PREAMBLE SYNC "00101101_11010100_00000110_11001011_00000000_11110111_11110010"
+#define CMD_CODE_LEN 2
 
-// Command lookup table
-const char* QuietCool::speed_settings[] = {
-    PREAMBLE "01100110_01100110", // PRE
-    PREAMBLE "10110001_10110001", // H1
-    PREAMBLE "10110010_10110010", // H2
-    PREAMBLE "10110100_10110100", // H4
-    PREAMBLE "10111000_10111000", // H8
-    PREAMBLE "10111100_10111100", // H12
-    PREAMBLE "10111111_10111111", // HON
-    PREAMBLE "10110000_10110000", // HOFF
-    PREAMBLE "10100001_10100001", // M1
-    PREAMBLE "10100010_10100010", // M2
-    PREAMBLE "10100100_10100100", // M4
-    PREAMBLE "10101000_10101000", // M8
-    PREAMBLE "10101100_10101100", // M12
-    PREAMBLE "10101111_10101111", // MON
-    PREAMBLE "10100000_10100000", // MOFF
-    PREAMBLE "10010001_10010001", // L1
-    PREAMBLE "10010010_10010010", // L2
-    PREAMBLE "10010100_10010100", // L4
-    PREAMBLE "10011000_10011000", // L8
-    PREAMBLE "10011100_10011100", // L12
-    PREAMBLE "10011111_10011111", // LON
-    PREAMBLE "10010000_10010000", // LOFF
+// Command codes as byte arrays (MSB first, from original working bitstream)
+const uint8_t QuietCool::speed_settings[][CMD_CODE_LEN] = {
+    {0x66, 0x66}, // PRE
+    {0xB1, 0xB1}, // H1
+    {0xB2, 0xB2}, // H2
+    {0xB4, 0xB4}, // H4
+    {0xB8, 0xB8}, // H8
+    {0xBC, 0xBC}, // H12
+    {0xBF, 0xBF}, // HON
+    {0xB0, 0xB0}, // HOFF
+    {0xA1, 0xA1}, // M1
+    {0xA2, 0xA2}, // M2
+    {0xA4, 0xA4}, // M4
+    {0xA8, 0xA8}, // M8
+    {0xAC, 0xAC}, // M12
+    {0xAF, 0xAF}, // MON
+    {0xA0, 0xA0}, // MOFF
+    {0x91, 0x91}, // L1
+    {0x92, 0x92}, // L2
+    {0x94, 0x94}, // L4
+    {0x98, 0x98}, // L8
+    {0x9C, 0x9C}, // L12
+    {0x9F, 0x9F}, // LON
+    {0x90, 0x90}, // LOFF
 };
+
+// Helper: Convert bytes to a bit string (MSB first)
+static void bytesToBitString(const uint8_t* data, size_t len, char* bitstr, size_t maxlen) {
+    size_t idx = 0;
+    for (size_t i = 0; i < len && idx + 8 < maxlen; i++) {
+        for (int b = 7; b >= 0; b--) {
+            bitstr[idx++] = ((data[i] >> b) & 1) ? '1' : '0';
+        }
+    }
+    bitstr[idx] = '\0';
+}
+
+// Helper: Log the bits in a byte array (MSB first)
+void QuietCool::logBits(const uint8_t* data, size_t len) {
+    char bitstr[8 * 32 + 1]; // up to 32 bytes (256 bits)
+    bytesToBitString(data, len, bitstr, sizeof(bitstr));
+    ESP_LOGD(TAG, "Bits sent: %s", bitstr);
+}
+
+void QuietCool::sendBitsFromBytes(const uint8_t *bytes, size_t byte_len) {
+    for (size_t i = 0; i < byte_len; i++) {
+        uint8_t value = bytes[i];
+        for (int b = 7; b >= 0; b--) {
+            digitalWrite(gdo0_pin, (value >> b) & 1);
+            delayMicroseconds(415);
+        }
+    }
+}
+
+void QuietCool::sendRawData(const uint8_t* data, size_t len) {
+    if (len == 0) {
+        ESP_LOGE(TAG, "No data to send");
+        return;
+    }
+    ESP_LOGD(TAG, "Sending %zu bytes (%zu bits)", len, len * 8);
+    logBits(data, len);
+    digitalWrite(gdo0_pin, 0);
+    noInterrupts();
+    ELECHOUSE_cc1101.SetTx();
+    sendBitsFromBytes(data, len); // MSB first per byte
+    ELECHOUSE_cc1101.setSidle();
+    interrupts();
+    delay(10);
+}
+
+void QuietCool::sendPacket(const uint8_t *cmd_code) {
+    uint8_t full_cmd[SYNC_LEN + REMOTE_ID_LEN + CMD_CODE_LEN];
+    memcpy(full_cmd, SYNC, SYNC_LEN);
+    memcpy(full_cmd + SYNC_LEN, REMOTE_ID, REMOTE_ID_LEN);
+    memcpy(full_cmd + SYNC_LEN + REMOTE_ID_LEN, cmd_code, CMD_CODE_LEN);
+    size_t total_len = SYNC_LEN + REMOTE_ID_LEN + CMD_CODE_LEN;
+    for (int i = 0; i < 3; i++) {
+        sendRawData(full_cmd, total_len);
+        delay(18);
+    }
+}
+
+const uint8_t* QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration duration) {
+    if (speed >= QUIETCOOL_SPEED_LAST || duration >= QUIETCOOL_DURATION_LAST) {
+        ESP_LOGE(TAG, "Invalid speed or duration");
+        return speed_settings[7];
+    }
+    const int BASE_HIGH = 1;
+    const int BASE_MEDIUM = 8;
+    const int BASE_LOW = 15;
+    const int INDEX_OFF = 7;
+    int index;
+    switch (speed) {
+        case QUIETCOOL_SPEED_HIGH:
+            index = BASE_HIGH + duration;
+            break;
+        case QUIETCOOL_SPEED_MEDIUM:
+            index = BASE_MEDIUM + duration;
+            break;
+        case QUIETCOOL_SPEED_LOW:
+            index = BASE_LOW + duration;
+            break;
+        case QUIETCOOL_SPEED_OFF:
+            index = INDEX_OFF;
+            break;
+        default:
+            ESP_LOGE(TAG, "Unhandled speed");
+            return speed_settings[INDEX_OFF];
+    }
+    const int total = sizeof(speed_settings) / sizeof(speed_settings[0]);
+    if (index < 0 || index >= total) {
+        ESP_LOGE(TAG, "Index out of bounds");
+        return speed_settings[INDEX_OFF];
+    }
+    return speed_settings[index];
+}
 
 QuietCool::QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi)
     : csn_pin(csn), gdo0_pin(gdo0), gdo2_pin(gdo2), sck_pin(sck), miso_pin(miso), mosi_pin(mosi) {}
@@ -93,84 +186,8 @@ bool QuietCool::initCC1101() {
     return true;
 }
 
-void QuietCool::sendPacket(const char *data, uint8_t len) {
-    for (int i = 0; i < 3; i++) {
-        sendRawData(data, len);
-        delay(18);
-    }
-}
-
-void QuietCool::sendBits(const char *data, uint8_t len) {
-    for (int bit = 0; bit < len; bit++) {
-	uint8_t b;
-	switch (data[bit]) {
-	case '1': b = 1; break;
-	case '0': b = 0; break;
-	default: continue;
-	}
-        digitalWrite(gdo0_pin, b);
-        delayMicroseconds(415);
-    }
-}
-
-void QuietCool::sendRawData(const char* data, uint8_t len) {
-    if (len == 0) {
-        ESP_LOGE(TAG, "No data to send");
-        return;
-    }
-
-    ESP_LOGD(TAG, "Sending %d bits", len);
-
-    digitalWrite(gdo0_pin, 0);
-    noInterrupts();
-    ELECHOUSE_cc1101.SetTx();
-    sendBits(data, len);
-    ELECHOUSE_cc1101.setSidle();
-    interrupts();
-
-    delay(10);
-}
-
 uint8_t QuietCool::readChipVersion() {
     return ELECHOUSE_cc1101.SpiReadReg(0xF1);
-}
-
-const char* QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration duration) {
-    if (speed >= QUIETCOOL_SPEED_LAST || duration >= QUIETCOOL_DURATION_LAST) {
-        ESP_LOGE(TAG, "Invalid speed or duration");
-        return speed_settings[7];
-    }
-
-    const int BASE_HIGH = 1;
-    const int BASE_MEDIUM = 8;
-    const int BASE_LOW = 15;
-    const int INDEX_OFF = 7;
-
-    int index;
-    switch (speed) {
-        case QUIETCOOL_SPEED_HIGH:
-            index = BASE_HIGH + duration;
-            break;
-        case QUIETCOOL_SPEED_MEDIUM:
-            index = BASE_MEDIUM + duration;
-            break;
-        case QUIETCOOL_SPEED_LOW:
-            index = BASE_LOW + duration;
-            break;
-        case QUIETCOOL_SPEED_OFF:
-            index = INDEX_OFF;
-            break;
-        default:
-            ESP_LOGE(TAG, "Unhandled speed");
-            return speed_settings[INDEX_OFF];
-    }
-
-    const int total = sizeof(speed_settings) / sizeof(speed_settings[0]);
-    if (index < 0 || index >= total) {
-        ESP_LOGE(TAG, "Index out of bounds");
-        return speed_settings[INDEX_OFF];
-    }
-    return speed_settings[index];
 }
 
 void QuietCool::begin() {
@@ -190,10 +207,10 @@ void QuietCool::begin() {
 
 void QuietCool::send(QuietCoolSpeed speed, QuietCoolDuration duration) {
     ESP_LOGI(TAG, "send(%d, %d)", speed, duration);
-    const char* cmd = getCommand(speed, duration);
-    ESP_LOGI(TAG, "%s", cmd);
-    if (cmd)
-        sendPacket(cmd, strlen(cmd)-1);
+    const uint8_t* cmd_code = getCommand(speed, duration);
+    ESP_LOGI(TAG, "%02x %02x", cmd_code[0], cmd_code[1]);
+    if (cmd_code)
+        sendPacket(cmd_code);
 }
 
 }  // namespace quiet_cool

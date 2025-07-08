@@ -1,7 +1,6 @@
 #pragma once
-
-#include <Arduino.h>
-#include "esphome/core/defines.h"  // ESPHome compile helpers
+#include <stdint.h>
+#include <stddef.h>
 
 /*
   CC1101 Pin Connections:
@@ -41,7 +40,7 @@ enum QuietCoolDuration {
 
 class QuietCool {
   private:
-    static const char* speed_settings[];
+    static const uint8_t speed_settings[][2];
     static constexpr uint8_t TO_BIT(char c) { return (c == '1') ? 1 : 0; }
 
     uint8_t csn_pin;
@@ -53,10 +52,13 @@ class QuietCool {
 
     bool initCC1101();
     uint8_t readChipVersion();
-    void sendRawData(const char* data, uint8_t len);
-    void sendBits(const char* data, uint8_t len);
-    void sendPacket(const char* data, uint8_t len);
-    const char* getCommand(QuietCoolSpeed speed, QuietCoolDuration duration);
+    void processBitsFromBytes(const uint8_t* bytes, size_t byte_len, bool send_to_pin);
+    void sendBitsFromBytes(const uint8_t* bytes, size_t byte_len);
+    void sendRawData(const uint8_t* data, size_t len);
+    void sendPacket(const uint8_t* cmd_code);
+    const uint8_t* getCommand(QuietCoolSpeed speed, QuietCoolDuration duration);
+    void logBits(const uint8_t* data, size_t len);
+    // REMOTE_ID is now the name for the unique remote identifier
 
   public:
     QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi);
