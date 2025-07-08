@@ -39,7 +39,7 @@ NOTE: the pinouts on these boards seem to be not reliable.  I had to trace them 
 * click `SKIP`
 * on your new entry, click `EDIT`
 * add the following to the bottom of the file:
-```
+```yaml
 spi:
   clk_pin: 18
   mosi_pin: 23
@@ -58,13 +58,14 @@ fan:
     cs_pin: 15
     gdo0_pin: 13
     gdo2_pin: 12
+    remote_id: [0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2]
 ```
 * click `INSTALL` and install it in the normal ESPHome ways...
 
 ## TL;DR -- get it running on ESPHome, building locally
 
 Create a `secrets.yaml` file
-```secrets.yaml
+```yaml
 wifi_ssid: <ssid>
 wifi_password: <wifi password>
 api_enctryption_key: <api key>
@@ -90,6 +91,50 @@ If everything is working, you should see
 [16:48:24][I][quietcool:179]: CC1101 ready
 [16:48:24][D][empty_fan.fan:022]: QuietCool initialized
 ```
+
+# Configuration
+
+## Required Configuration
+
+The `remote_id` field is **required** and must match your specific QuietCool remote. This is a 7-byte identifier that uniquely identifies your remote control.
+
+> **Note:** QuietCool fans can pair with multiple remotes. This means you may not need to decode your existing remote's ID. Instead, you can simply pair this new ESPHome-based remote (with its own `remote_id`) to your fan, and both your original remote and the Home Assistant remote should work together.  This has yet to be tested.
+
+
+### Finding Your Remote ID
+
+NOTE:  you may not need to decode your existing remote's ID.  Instead, you can simply pair this new ESPHome-based remote (with its own `remote_id`) to your fan, and both your original remote and the Home Assistant remote should work together.  This has yet to be tested.
+
+To find your remote ID, you can:
+1. Use an RTL-SDR to capture signals from your physical remote
+2. Analyze the captured signals to extract the remote ID
+3. Or use the default value as a starting point: `[0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2]`
+
+### Example Configuration
+
+```yaml
+fan:
+  - platform: quiet_cool
+    name: QuietCool fan
+    cs_pin: 15
+    gdo0_pin: 13
+    gdo2_pin: 12
+    remote_id: [0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2]
+```
+
+## Recent Improvements
+
+### Transmission System Overhaul
+- **Consolidated bit conversion logic**: Unified logging and transmission to ensure consistency
+- **Improved reliability**: Fixed potential timing and synchronization issues
+- **Better debugging**: Enhanced logging with bit-level visibility
+- **Configurable remote ID**: Support for custom remote identifiers via YAML configuration
+
+### Technical Changes
+- Replaced string-based command system with byte arrays for better performance
+- Consolidated `logBits` and `sendBitsFromBytes` functions to use shared logic
+- Added configurable `remote_id` parameter throughout the stack
+- Improved error handling and validation
 
 # Run it on arduino
 The arduino code doesn't do much by itself.  But it gets you going:
@@ -148,6 +193,7 @@ The source is here [in OnShape](https://cad.onshape.com/documents/23ba2be84b2f4d
     - 12
     - off
     - on
+- **Configurable remote ID** for compatibility with different remotes
 
 # Reverse Engineering
 I used an RTL-SDR.COM SDR like this:
