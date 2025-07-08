@@ -49,6 +49,7 @@ class QuietCool {
     uint8_t sck_pin;
     uint8_t miso_pin;
     uint8_t mosi_pin;
+    uint8_t remote_id[7];
 
     bool initCC1101();
     uint8_t readChipVersion();
@@ -61,7 +62,7 @@ class QuietCool {
     // REMOTE_ID is now the name for the unique remote identifier
 
   public:
-    QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi);
+    QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi, const uint8_t* remote_id_in);
     void begin();
     void send(QuietCoolSpeed speed, QuietCoolDuration duration);
 };

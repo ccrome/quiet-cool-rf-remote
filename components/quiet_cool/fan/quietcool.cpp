@@ -8,7 +8,6 @@ namespace quiet_cool {
 static const char *TAG = "quietcool";
 
 const uint8_t SYNC[] = {0x15, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa};
-const uint8_t REMOTE_ID[] = {0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2};
 #define SYNC_LEN (sizeof(SYNC))
 #define REMOTE_ID_LEN (sizeof(REMOTE_ID))
 
@@ -85,11 +84,11 @@ void QuietCool::sendRawData(const uint8_t* data, size_t len) {
 }
 
 void QuietCool::sendPacket(const uint8_t *cmd_code) {
-    uint8_t full_cmd[SYNC_LEN + REMOTE_ID_LEN + CMD_CODE_LEN];
+    uint8_t full_cmd[SYNC_LEN + 7 + CMD_CODE_LEN];
     memcpy(full_cmd, SYNC, SYNC_LEN);
-    memcpy(full_cmd + SYNC_LEN, REMOTE_ID, REMOTE_ID_LEN);
-    memcpy(full_cmd + SYNC_LEN + REMOTE_ID_LEN, cmd_code, CMD_CODE_LEN);
-    size_t total_len = SYNC_LEN + REMOTE_ID_LEN + CMD_CODE_LEN;
+    memcpy(full_cmd + SYNC_LEN, remote_id, 7);
+    memcpy(full_cmd + SYNC_LEN + 7, cmd_code, CMD_CODE_LEN);
+    size_t total_len = SYNC_LEN + 7 + CMD_CODE_LEN;
     for (int i = 0; i < 3; i++) {
         sendRawData(full_cmd, total_len);
         delay(18);
@@ -131,8 +130,10 @@ const uint8_t* QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration dur
     return speed_settings[index];
 }
 
-QuietCool::QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi)
-    : csn_pin(csn), gdo0_pin(gdo0), gdo2_pin(gdo2), sck_pin(sck), miso_pin(miso), mosi_pin(mosi) {}
+QuietCool::QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi, const uint8_t* remote_id_in)
+    : csn_pin(csn), gdo0_pin(gdo0), gdo2_pin(gdo2), sck_pin(sck), miso_pin(miso), mosi_pin(mosi) {
+    for (int i = 0; i < 7; ++i) remote_id[i] = remote_id_in[i];
+}
 
 // --- Initialize CC1101 and verify communication ---
 bool QuietCool::initCC1101() {

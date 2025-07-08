@@ -34,6 +34,11 @@ namespace esphome {
 	    uint8_t gdo2_pin_{};
 	    float speed_{0.0f};
 	    bool pins_set_{false};
+	    std::array<uint8_t, 7> remote_id_{{0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2}};
+	public:
+	    void set_remote_id(const std::vector<uint8_t> &remote_id) {
+	        for (size_t i = 0; i < 7 && i < remote_id.size(); ++i) remote_id_[i] = remote_id[i];
+	    }
 	};
 
     }  // namespace quiet_cool

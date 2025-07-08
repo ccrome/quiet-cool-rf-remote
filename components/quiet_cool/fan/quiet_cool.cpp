@@ -15,7 +15,7 @@ namespace esphome {
 
 	    if (this->qc_ == nullptr) {
 		// Use standard VSPI pins (CLK18, MISO19, MOSI23) for ESP32 dev boards
-		this->qc_.reset(new QuietCool(this->csn_pin_, this->gdo0_pin_, this->gdo2_pin_, 18, 19, 23));
+		this->qc_.reset(new QuietCool(this->csn_pin_, this->gdo0_pin_, this->gdo2_pin_, 18, 19, 23, remote_id_.data()));
 	    }
 
 	    this->qc_->begin();
