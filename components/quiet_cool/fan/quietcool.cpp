@@ -13,31 +13,27 @@ const uint8_t SYNC[] = {0x15, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa};
 
 #define CMD_CODE_LEN 2
 
-// Command codes as byte arrays (MSB first, from original working bitstream)
-const uint8_t QuietCool::speed_settings[][CMD_CODE_LEN] = {
-    {0x66, 0x66}, // PRE
-    {0xB1, 0xB1}, // H1
-    {0xB2, 0xB2}, // H2
-    {0xB4, 0xB4}, // H4
-    {0xB8, 0xB8}, // H8
-    {0xBC, 0xBC}, // H12
-    {0xBF, 0xBF}, // HON
-    {0xB0, 0xB0}, // HOFF
-    {0xA1, 0xA1}, // M1
-    {0xA2, 0xA2}, // M2
-    {0xA4, 0xA4}, // M4
-    {0xA8, 0xA8}, // M8
-    {0xAC, 0xAC}, // M12
-    {0xAF, 0xAF}, // MON
-    {0xA0, 0xA0}, // MOFF
-    {0x91, 0x91}, // L1
-    {0x92, 0x92}, // L2
-    {0x94, 0x94}, // L4
-    {0x98, 0x98}, // L8
-    {0x9C, 0x9C}, // L12
-    {0x9F, 0x9F}, // LON
-    {0x90, 0x90}, // LOFF
-};
+// Commands are structured like this:
+// LOW: 0x90
+// MED: 0xA0    
+// HIGH:0xB0
+//
+//  1 hour: 0x01
+//  2 hour: 0x02
+//  4 hour: 0x04
+//  8 hour: 0x08
+// 12 hour: 0x0C
+//      on: 0x0F
+//     off: 0x00
+//
+// the special command that's sent before anything else is 0x66.
+
+// So, final packet format is:
+//     <---- SYNC -------><--- ID -----><CD>
+// 0x: 150aaaaaaaaaaaaaaaaTTUUVVWWXXYYZZGGGG
+// sync: always the same
+//   ID: unique identifier
+//   CD: command, as described above.  Two bytes duplicated.
 
 // Helper: Convert bytes to a bit string (MSB first)
 static void bytesToBitString(const uint8_t* data, size_t len, char* bitstr, size_t maxlen) {
@@ -83,11 +79,12 @@ void QuietCool::sendRawData(const uint8_t* data, size_t len) {
     delay(10);
 }
 
-void QuietCool::sendPacket(const uint8_t *cmd_code) {
+void QuietCool::sendPacket(const uint8_t cmd_code) {
     uint8_t full_cmd[SYNC_LEN + 7 + CMD_CODE_LEN];
     memcpy(full_cmd, SYNC, SYNC_LEN);
     memcpy(full_cmd + SYNC_LEN, remote_id, 7);
-    memcpy(full_cmd + SYNC_LEN + 7, cmd_code, CMD_CODE_LEN);
+    memcpy(full_cmd + SYNC_LEN + 7, &cmd_code, 1);
+    memcpy(full_cmd + SYNC_LEN + 8, &cmd_code, 1);
     size_t total_len = SYNC_LEN + 7 + CMD_CODE_LEN;
     for (int i = 0; i < 3; i++) {
         sendRawData(full_cmd, total_len);
@@ -95,39 +92,28 @@ void QuietCool::sendPacket(const uint8_t *cmd_code) {
     }
 }
 
-const uint8_t* QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration duration) {
-    if (speed >= QUIETCOOL_SPEED_LAST || duration >= QUIETCOOL_DURATION_LAST) {
-        ESP_LOGE(TAG, "Invalid speed or duration");
-        return speed_settings[7];
-    }
-    const int BASE_HIGH = 1;
-    const int BASE_MEDIUM = 8;
-    const int BASE_LOW = 15;
-    const int INDEX_OFF = 7;
-    int index;
+const uint8_t QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration duration) {
+    const uint8_t off = QUIETCOOL_DURATION_OFF | QUIETCOOL_SPEED_LOW;
     switch (speed) {
-        case QUIETCOOL_SPEED_HIGH:
-            index = BASE_HIGH + duration;
-            break;
-        case QUIETCOOL_SPEED_MEDIUM:
-            index = BASE_MEDIUM + duration;
-            break;
-        case QUIETCOOL_SPEED_LOW:
-            index = BASE_LOW + duration;
-            break;
-        case QUIETCOOL_SPEED_OFF:
-            index = INDEX_OFF;
-            break;
-        default:
-            ESP_LOGE(TAG, "Unhandled speed");
-            return speed_settings[INDEX_OFF];
+    case QUIETCOOL_SPEED_HIGH:
+    case QUIETCOOL_SPEED_MEDIUM:
+    case QUIETCOOL_SPEED_LOW:
+	break;
+    default: return off;
+    };
+
+    switch (duration) {
+    case QUIETCOOL_DURATION_1H  :
+    case QUIETCOOL_DURATION_2H  :
+    case QUIETCOOL_DURATION_4H  :
+    case QUIETCOOL_DURATION_8H  :
+    case QUIETCOOL_DURATION_12H :
+    case QUIETCOOL_DURATION_ON  :
+    case QUIETCOOL_DURATION_OFF :
+	break;
+    default: return off;
     }
-    const int total = sizeof(speed_settings) / sizeof(speed_settings[0]);
-    if (index < 0 || index >= total) {
-        ESP_LOGE(TAG, "Index out of bounds");
-        return speed_settings[INDEX_OFF];
-    }
-    return speed_settings[index];
+    return speed | duration;
 }
 
 QuietCool::QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi, const uint8_t* remote_id_in)
@@ -142,17 +128,17 @@ bool QuietCool::initCC1101() {
     int tries = 10;
     bool detected = false;
     while (tries--) {
-	uint8_t version = readChipVersion();
-	ESP_LOGI(TAG, "CC1101 VERSION READ: 0x%02X", version);
-	if (version == 0x14 || version == 0x04) {
-	    ESP_LOGI(TAG, "CC1101 detected!");
-	    detected = true;
-	    break;
-	}
+        uint8_t version = readChipVersion();
+        ESP_LOGI(TAG, "CC1101 VERSION READ: 0x%02X", version);
+        if (version == 0x14 || version == 0x04) {
+            ESP_LOGI(TAG, "CC1101 detected!");
+            detected = true;
+            break;
+        }
     }
     if (!detected) {
-	ESP_LOGE(TAG, "CC1101 not detected!");
-	return false;
+        ESP_LOGE(TAG, "CC1101 not detected!");
+        return false;
     }
     if (!ELECHOUSE_cc1101.getCC1101()) {
         ESP_LOGE(TAG, "CC1101 connection error");
@@ -208,10 +194,9 @@ void QuietCool::begin() {
 
 void QuietCool::send(QuietCoolSpeed speed, QuietCoolDuration duration) {
     ESP_LOGI(TAG, "send(%d, %d)", speed, duration);
-    const uint8_t* cmd_code = getCommand(speed, duration);
-    ESP_LOGI(TAG, "%02x %02x", cmd_code[0], cmd_code[1]);
-    if (cmd_code)
-        sendPacket(cmd_code);
+    const uint8_t cmd_code = getCommand(speed, duration);
+    ESP_LOGI(TAG, "cmd=%02x ", cmd_code);
+    sendPacket(cmd_code);
 }
 
 }  // namespace quiet_cool

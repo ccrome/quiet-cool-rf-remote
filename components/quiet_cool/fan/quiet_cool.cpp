@@ -35,15 +35,16 @@ namespace esphome {
 	    if (call.get_state().has_value())
 		this->state = *call.get_state();
 
-	    QuietCoolSpeed qcspd = QUIETCOOL_SPEED_OFF;
+	    QuietCoolSpeed qcspd = QUIETCOOL_SPEED_LOW;
+	    QuietCoolDuration qcdur = QUIETCOOL_DURATION_ON;
 	    if (call.get_speed().has_value()) {
 		this->speed_ = *call.get_speed();
-		if (this->speed_ < 0.5) qcspd = QUIETCOOL_SPEED_OFF;
+		if (this->speed_ < 0.5) qcdur = QUIETCOOL_DURATION_OFF;
 		else if (this->speed_ < 1.5) qcspd = QUIETCOOL_SPEED_LOW;
 		else if (this->speed_ < 2.5) qcspd = QUIETCOOL_SPEED_MEDIUM;
 		else if (this->speed_ < 3.5) qcspd = QUIETCOOL_SPEED_HIGH;
 	    }
-	    if (this->qc_) this->qc_->send(qcspd, QUIETCOOL_DURATION_12H);
+	    if (this->qc_) this->qc_->send(qcspd, qcdur);
 
 
 	    ESP_LOGV(TAG, "Post-update internal state: state=%s speed=%s", 
@@ -61,16 +62,6 @@ namespace esphome {
 	}
 
 	void QuietCoolFan::dump_config() { LOG_FAN("", "QuietCool fan", this); }
-
-	void QuietCoolFan::send_power_command_(bool on) {
-	    if (this->qc_ != nullptr) {
-		ESP_LOGI(TAG, "Transmitting %s command via QuietCool", on ? "ON" : "OFF");
-		this->qc_->send(on ? QUIETCOOL_SPEED_HIGH : QUIETCOOL_SPEED_OFF, QUIETCOOL_DURATION_ON);
-	    } else {
-		ESP_LOGW(TAG, "QuietCool not initialized yet; skipping transmit");
-	    }
-	}
-
     }  // namespace quiet_cool
 }  // namespace esphome
 

@@ -25,7 +25,6 @@ namespace esphome {
 	protected:
 	    void control(const fan::FanCall &call) override;
 	    void write_state_();
-	    void send_power_command_(bool on);
 	private:
 	    std::unique_ptr<QuietCool> qc_;
 

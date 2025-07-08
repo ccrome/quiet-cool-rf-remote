@@ -21,26 +21,25 @@ namespace esphome {
 namespace quiet_cool {
 
 enum QuietCoolSpeed {
-    QUIETCOOL_SPEED_HIGH,
-    QUIETCOOL_SPEED_MEDIUM,
-    QUIETCOOL_SPEED_LOW,
-    QUIETCOOL_SPEED_OFF,
+    QUIETCOOL_SPEED_HIGH   =  0xB0,
+    QUIETCOOL_SPEED_MEDIUM =  0xA0,
+    QUIETCOOL_SPEED_LOW    =  0x90,
     QUIETCOOL_SPEED_LAST
 };
 
 enum QuietCoolDuration {
-    QUIETCOOL_DURATION_1H,
-    QUIETCOOL_DURATION_2H,
-    QUIETCOOL_DURATION_4H,
-    QUIETCOOL_DURATION_8H,
-    QUIETCOOL_DURATION_12H,
-    QUIETCOOL_DURATION_ON,
+    QUIETCOOL_DURATION_1H   = 0x01,
+    QUIETCOOL_DURATION_2H   = 0x02,
+    QUIETCOOL_DURATION_4H   = 0x04,
+    QUIETCOOL_DURATION_8H   = 0x08,
+    QUIETCOOL_DURATION_12H  = 0x0C,
+    QUIETCOOL_DURATION_ON   = 0x0F,
+    QUIETCOOL_DURATION_OFF  = 0x00,
     QUIETCOOL_DURATION_LAST
 };
 
 class QuietCool {
   private:
-    static const uint8_t speed_settings[][2];
     static constexpr uint8_t TO_BIT(char c) { return (c == '1') ? 1 : 0; }
 
     uint8_t csn_pin;
@@ -56,8 +55,8 @@ class QuietCool {
     void processBitsFromBytes(const uint8_t* bytes, size_t byte_len, bool send_to_pin);
     void sendBitsFromBytes(const uint8_t* bytes, size_t byte_len);
     void sendRawData(const uint8_t* data, size_t len);
-    void sendPacket(const uint8_t* cmd_code);
-    const uint8_t* getCommand(QuietCoolSpeed speed, QuietCoolDuration duration);
+    void sendPacket(const uint8_t cmd_code);
+    const uint8_t getCommand(QuietCoolSpeed speed, QuietCoolDuration duration);
     void logBits(const uint8_t* data, size_t len);
     // REMOTE_ID is now the name for the unique remote identifier
 
