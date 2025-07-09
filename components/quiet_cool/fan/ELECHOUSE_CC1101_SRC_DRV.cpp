@@ -118,8 +118,8 @@ void ELECHOUSE_CC1101::SpiEnd(void)
 ****************************************************************/
 void ELECHOUSE_CC1101::GDO_Set (void)
 {
-	pinMode(GDO0, OUTPUT);
-	pinMode(GDO2, INPUT);
+    pinMode(GDO0, OUTPUT);
+    pinMode(GDO2, INPUT);
 }
 /****************************************************************
 *FUNCTION NAME: GDO_Set()
@@ -139,15 +139,15 @@ void ELECHOUSE_CC1101::GDO0_Set (void)
 ****************************************************************/
 void ELECHOUSE_CC1101::Reset (void)
 {
-	digitalWrite(SS_PIN, LOW);
-	delay(1);
-	digitalWrite(SS_PIN, HIGH);
-	delay(1);
-	digitalWrite(SS_PIN, LOW);
-	while(digitalRead(MISO_PIN));
+    digitalWrite(SS_PIN, LOW);
+    delay(1);
+    digitalWrite(SS_PIN, HIGH);
+    delay(1);
+    digitalWrite(SS_PIN, LOW);
+    while(digitalRead(MISO_PIN));
   SPI.transfer(CC1101_SRES);
   while(digitalRead(MISO_PIN));
-	digitalWrite(SS_PIN, HIGH);
+    digitalWrite(SS_PIN, HIGH);
 }
 /****************************************************************
 *FUNCTION NAME:Init
@@ -1267,15 +1267,15 @@ return 0;
 byte ELECHOUSE_CC1101::CheckReceiveFlag(void)
 {
   if(trxstate!=2){SetRx();}
-	if(digitalRead(GDO0))			//receive data
-	{
-		while (digitalRead(GDO0));
-		return 1;
-	}
-	else							// no data
-	{
-		return 0;
-	}
+    if(digitalRead(GDO0))           //receive data
+    {
+        while (digitalRead(GDO0));
+        return 1;
+    }
+    else                            // no data
+    {
+        return 0;
+    }
 }
 /****************************************************************
 *FUNCTION NAME:ReceiveData
@@ -1285,23 +1285,23 @@ byte ELECHOUSE_CC1101::CheckReceiveFlag(void)
 ****************************************************************/
 byte ELECHOUSE_CC1101::ReceiveData(byte *rxBuffer)
 {
-	byte size;
-	byte status[2];
+    byte size;
+    byte status[2];
 
-	if(SpiReadStatus(CC1101_RXBYTES) & BYTES_IN_RXFIFO)
-	{
-		size=SpiReadReg(CC1101_RXFIFO);
-		SpiReadBurstReg(CC1101_RXFIFO,rxBuffer,size);
-		SpiReadBurstReg(CC1101_RXFIFO,status,2);
-		SpiStrobe(CC1101_SFRX);
+    if(SpiReadStatus(CC1101_RXBYTES) & BYTES_IN_RXFIFO)
+    {
+        size=SpiReadReg(CC1101_RXFIFO);
+        SpiReadBurstReg(CC1101_RXFIFO,rxBuffer,size);
+        SpiReadBurstReg(CC1101_RXFIFO,status,2);
+        SpiStrobe(CC1101_SFRX);
     SpiStrobe(CC1101_SRX);
-		return size;
-	}
-	else
-	{
-		SpiStrobe(CC1101_SFRX);
+        return size;
+    }
+    else
+    {
+        SpiStrobe(CC1101_SFRX);
     SpiStrobe(CC1101_SRX);
- 		return 0;
-	}
+        return 0;
+    }
 }
 ELECHOUSE_CC1101 ELECHOUSE_cc1101;

@@ -98,7 +98,7 @@ const uint8_t QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration dura
     case QUIETCOOL_SPEED_HIGH:
     case QUIETCOOL_SPEED_MEDIUM:
     case QUIETCOOL_SPEED_LOW:
-	break;
+    break;
     default: return off;
     };
 
@@ -110,10 +110,12 @@ const uint8_t QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration dura
     case QUIETCOOL_DURATION_12H :
     case QUIETCOOL_DURATION_ON  :
     case QUIETCOOL_DURATION_OFF :
-	break;
+    break;
     default: return off;
     }
-    return speed | duration;
+    uint8_t result = speed | duration;
+    ESP_LOGD(TAG, "Sending speed=0x%02x, duration=0x%02x: 0x%02x", speed, duration, result);
+    return result;
 }
 
 QuietCool::QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi, const uint8_t* remote_id_in)
