@@ -44,7 +44,7 @@ class QuietCool {
 
     uint8_t csn_pin;
     uint8_t gdo0_pin;
-    uint8_t gdo2_pin;
+    uint8_t gdo2_pin; // allow -1 for invalid
     uint8_t sck_pin;
     uint8_t miso_pin;
     uint8_t mosi_pin;
@@ -53,7 +53,6 @@ class QuietCool {
     bool initCC1101();
     uint8_t readChipVersion();
     void processBitsFromBytes(const uint8_t* bytes, size_t byte_len, bool send_to_pin);
-    void sendBitsFromBytes(const uint8_t* bytes, size_t byte_len);
     void sendRawData(const uint8_t* data, size_t len);
     void sendPacket(const uint8_t cmd_code);
     const uint8_t getCommand(QuietCoolSpeed speed, QuietCoolDuration duration);
