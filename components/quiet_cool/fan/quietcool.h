@@ -49,6 +49,7 @@ class QuietCool {
     uint8_t remote_id[7];
     float   center_freq_mhz;
     float   deviation_khz;
+    uint8_t preamble_byte{0xAA};
 
     bool initCC1101();
     uint8_t readChipVersion();
@@ -63,6 +64,13 @@ class QuietCool {
     QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi, const uint8_t* remote_id_in, float freq_mhz, float deviation_khz);
     void begin();
     void send(QuietCoolSpeed speed, QuietCoolDuration duration);
+
+    // The preamble byte following the leading 0x15. Default 0xAA matches the
+    // original reverse-engineered protocol; some hubs (e.g. Stealth Pro 7.0 with
+    // the latest firmware) reject this and require 0x55 instead. 0x15 0xAA has
+    // a `1,1` bit at the byte boundary that breaks strict bit-sync decoders;
+    // 0x55 gives a purely alternating bit stream.
+    void setPreambleByte(uint8_t b) { preamble_byte = b; }
 };
 
 }  // namespace quiet_cool

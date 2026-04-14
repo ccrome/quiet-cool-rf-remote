@@ -10,8 +10,7 @@ namespace quiet_cool {
 
 static const char *TAG = "quietcool";
 
-const uint8_t SYNC[] = {0x15, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa};
-#define SYNC_LEN (sizeof(SYNC))
+#define SYNC_LEN 9
 #define REMOTE_ID_LEN (sizeof(REMOTE_ID))
 
 #define CMD_CODE_LEN 2
@@ -81,7 +80,8 @@ void QuietCool::sendPacket(const uint8_t cmd_code) {
     const uint8_t padding_len = 2;
     uint8_t full_cmd[SYNC_LEN + 7 + CMD_CODE_LEN+padding_len];
     memset(full_cmd, 0, sizeof(full_cmd));
-    memcpy(full_cmd, SYNC, SYNC_LEN);
+    full_cmd[0] = 0x15;
+    for (size_t i = 1; i < SYNC_LEN; i++) full_cmd[i] = preamble_byte;
     memcpy(full_cmd + SYNC_LEN, remote_id, 7);
     memcpy(full_cmd + SYNC_LEN + 7, &cmd_code, 1);
     memcpy(full_cmd + SYNC_LEN + 8, &cmd_code, 1);
