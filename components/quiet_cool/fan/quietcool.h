@@ -49,11 +49,15 @@ class QuietCool {
     uint8_t remote_id[7];
     float   center_freq_mhz;
     float   deviation_khz;
-    uint8_t preamble_byte{0xAA};
-    bool    fsctrl0_override_enabled{false};
-    uint8_t fsctrl0_override_value{0};
+    uint8_t  preamble_byte{0xAA};
+    bool     fsctrl0_override_enabled{false};
+    uint8_t  fsctrl0_override_value{0};
+    bool     verify_ack{false};
+    uint32_t ack_timeout_ms{800};
+    uint8_t  max_send_attempts{5};
 
     bool initCC1101();
+    bool awaitAck(uint32_t timeout_ms);
     uint8_t readChipVersion();
     void processBitsFromBytes(const uint8_t* bytes, size_t byte_len, bool send_to_pin);
     void sendRawData(const uint8_t* data, size_t len);
@@ -80,6 +84,16 @@ class QuietCool {
     // complement; each unit is f_XOSC/2^14 ≈ 1.587 kHz. Pass 0 to cancel the
     // library's offset; pass other values to dial in per-unit crystal drift.
     void setFsctrl0Override(uint8_t v) { fsctrl0_override_enabled = true; fsctrl0_override_value = v; }
+
+    // Bidirectional protocol: when enabled, after each transmit the radio
+    // switches to RX and listens for the hub's ACK packet (verified to exist
+    // via SDR analysis — same 2-FSK / 433.92 MHz / preamble+ID structure as
+    // the remote's TX, arriving ~250 ms later in groups of 3). If no ACK is
+    // detected within `timeout_ms` the packet is retransmitted, up to `max`
+    // attempts total. Matches the real remote's out-of-range error behavior.
+    void setVerifyAck(bool v) { verify_ack = v; }
+    void setAckTimeoutMs(uint32_t v) { ack_timeout_ms = v; }
+    void setMaxSendAttempts(uint8_t v) { max_send_attempts = v; }
 };
 
 }  // namespace quiet_cool

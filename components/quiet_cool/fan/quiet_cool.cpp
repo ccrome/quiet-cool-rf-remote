@@ -18,6 +18,9 @@ namespace esphome {
                 this->qc_.reset(new QuietCool(this->csn_pin_, this->gdo0_pin_, this->gdo2_pin_, 18, 19, 23, remote_id_.data(), center_freq_mhz, deviation_khz));
                 this->qc_->setPreambleByte(this->preamble_byte_);
                 if (this->fsctrl0_override_enabled_) this->qc_->setFsctrl0Override(this->fsctrl0_override_value_);
+                this->qc_->setVerifyAck(this->verify_ack_);
+                this->qc_->setAckTimeoutMs(this->ack_timeout_ms_);
+                this->qc_->setMaxSendAttempts(this->max_send_attempts_);
             }
 
             this->qc_->begin();

@@ -47,6 +47,9 @@ namespace esphome {
             uint8_t preamble_byte_{0xAA};
             bool    fsctrl0_override_enabled_{false};
             uint8_t fsctrl0_override_value_{0};
+            bool     verify_ack_{false};
+            uint32_t ack_timeout_ms_{800};
+            uint8_t  max_send_attempts_{5};
             std::array<uint8_t, 7> remote_id_{{0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2}};
         public:
             void set_remote_id(const std::vector<uint8_t> &remote_id) {
@@ -54,6 +57,9 @@ namespace esphome {
             }
             void set_preamble_byte(uint8_t b) { preamble_byte_ = b; }
             void set_fsctrl0_override(uint8_t v) { fsctrl0_override_enabled_ = true; fsctrl0_override_value_ = v; }
+            void set_verify_ack(bool v) { verify_ack_ = v; }
+            void set_ack_timeout_ms(uint32_t v) { ack_timeout_ms_ = v; }
+            void set_max_send_attempts(uint8_t v) { max_send_attempts_ = v; }
         };
 
     }  // namespace quiet_cool

@@ -17,6 +17,9 @@ CONF_FREQ_MHZ = "center_freq_mhz"
 CONF_DEVIATION_KHZ = "deviation_khz"
 CONF_PREAMBLE_BYTE = "preamble_byte"
 CONF_FSCTRL0_OVERRIDE = "fsctrl0_override"
+CONF_VERIFY_ACK = "verify_ack"
+CONF_ACK_TIMEOUT_MS = "ack_timeout_ms"
+CONF_MAX_SEND_ATTEMPTS = "max_send_attempts"
 
 DEPENDENCIES = ["spi"]
 
@@ -43,6 +46,13 @@ CONFIG_SCHEMA = fan.fan_schema(QuietCoolFan).extend(
         # value to dial in per-unit crystal drift. Leave unset to keep the
         # library's behavior.
         cv.Optional(CONF_FSCTRL0_OVERRIDE              ): cv.hex_uint8_t,
+        # Bidirectional protocol: when enabled, after every transmit the radio
+        # switches to RX, listens for the hub's ACK packet, and retries the
+        # send up to max_send_attempts if no ACK arrives within ack_timeout_ms.
+        # Defaults preserve the current one-shot (no-ACK) behavior.
+        cv.Optional(CONF_VERIFY_ACK, default=False   ): cv.boolean,
+        cv.Optional(CONF_ACK_TIMEOUT_MS, default=800 ): cv.positive_int,
+        cv.Optional(CONF_MAX_SEND_ATTEMPTS, default=5): cv.int_range(min=1, max=32),
     }
 ).extend(cv.COMPONENT_SCHEMA).extend(spi.spi_device_schema(cs_pin_required=True))
 
@@ -60,3 +70,6 @@ async def to_code(config):
     cg.add(var.set_preamble_byte(config[CONF_PREAMBLE_BYTE]))
     if CONF_FSCTRL0_OVERRIDE in config:
         cg.add(var.set_fsctrl0_override(config[CONF_FSCTRL0_OVERRIDE]))
+    cg.add(var.set_verify_ack(config[CONF_VERIFY_ACK]))
+    cg.add(var.set_ack_timeout_ms(config[CONF_ACK_TIMEOUT_MS]))
+    cg.add(var.set_max_send_attempts(config[CONF_MAX_SEND_ATTEMPTS]))
