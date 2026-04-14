@@ -189,6 +189,17 @@ bool QuietCool::initCC1101() {
     ELECHOUSE_cc1101.setPacketLength(20);
     ELECHOUSE_cc1101.setPRE(0);
 
+    // FSCTRL0 override: ELECHOUSE's Calibrate() (called from setMHZ) writes a
+    // frequency-mapped value into FSCTRL0, adding a synth offset to the TX
+    // center. Undo it here if the user requested an override.
+    if (fsctrl0_override_enabled) {
+        ELECHOUSE_cc1101.SpiStrobe(0x36);  // SIDLE
+        delayMicroseconds(100);
+        ELECHOUSE_cc1101.SpiWriteReg(0x0C, fsctrl0_override_value);  // FSCTRL0
+        ELECHOUSE_cc1101.SpiStrobe(0x33);  // SCAL
+        delay(2);
+    }
+
     delay(500);
     return true;
 }

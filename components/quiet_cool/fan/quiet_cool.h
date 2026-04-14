@@ -45,12 +45,15 @@ namespace esphome {
             float speed_{0.0f};
             bool pins_set_{false};
             uint8_t preamble_byte_{0xAA};
+            bool    fsctrl0_override_enabled_{false};
+            uint8_t fsctrl0_override_value_{0};
             std::array<uint8_t, 7> remote_id_{{0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2}};
         public:
             void set_remote_id(const std::vector<uint8_t> &remote_id) {
                 for (size_t i = 0; i < 7 && i < remote_id.size(); ++i) remote_id_[i] = remote_id[i];
             }
             void set_preamble_byte(uint8_t b) { preamble_byte_ = b; }
+            void set_fsctrl0_override(uint8_t v) { fsctrl0_override_enabled_ = true; fsctrl0_override_value_ = v; }
         };
 
     }  // namespace quiet_cool

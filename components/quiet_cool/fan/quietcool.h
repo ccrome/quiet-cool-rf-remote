@@ -50,6 +50,8 @@ class QuietCool {
     float   center_freq_mhz;
     float   deviation_khz;
     uint8_t preamble_byte{0xAA};
+    bool    fsctrl0_override_enabled{false};
+    uint8_t fsctrl0_override_value{0};
 
     bool initCC1101();
     uint8_t readChipVersion();
@@ -71,6 +73,13 @@ class QuietCool {
     // a `1,1` bit at the byte boundary that breaks strict bit-sync decoders;
     // 0x55 gives a purely alternating bit stream.
     void setPreambleByte(uint8_t b) { preamble_byte = b; }
+
+    // Override FSCTRL0 (frequency-synthesizer offset, register 0x0C) after
+    // setMHZ(). ELECHOUSE's Calibrate() writes a frequency-mapped value here
+    // (at 433 MHz that's ~35, ~+55 kHz offset). The register is 8-bit two's
+    // complement; each unit is f_XOSC/2^14 ≈ 1.587 kHz. Pass 0 to cancel the
+    // library's offset; pass other values to dial in per-unit crystal drift.
+    void setFsctrl0Override(uint8_t v) { fsctrl0_override_enabled = true; fsctrl0_override_value = v; }
 };
 
 }  // namespace quiet_cool
