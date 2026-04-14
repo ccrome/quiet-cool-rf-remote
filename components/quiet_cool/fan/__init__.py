@@ -28,7 +28,7 @@ DEPENDENCIES = ["spi"]
 
 QuietCoolFan = quiet_cool_ns.class_("QuietCoolFan", cg.Component, fan.Fan, spi.SPIDevice)
 
-CONFIG_SCHEMA = fan.fan_schema(QuietCoolFan).extend(
+CONFIG_SCHEMA = fan.FAN_SCHEMA.extend(
     {
         cv.GenerateID(CONF_OUTPUT_ID): cv.declare_id(QuietCoolFan),
         cv.Required(CONF_GDO0_PIN                      ): cv.uint8_t,
