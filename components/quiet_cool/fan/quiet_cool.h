@@ -40,6 +40,9 @@ namespace esphome {
             uint8_t csn_pin_{};
             uint8_t gdo0_pin_{};
             uint8_t gdo2_pin_{};
+            uint8_t sck_pin_{18};
+            uint8_t miso_pin_{19};
+            uint8_t mosi_pin_{23};
 	    float center_freq_mhz{433.897};
 	    float deviation_khz{10};
             float speed_{0.0f};
@@ -60,6 +63,12 @@ namespace esphome {
             void set_verify_ack(bool v) { verify_ack_ = v; }
             void set_ack_timeout_ms(uint32_t v) { ack_timeout_ms_ = v; }
             void set_max_send_attempts(uint8_t v) { max_send_attempts_ = v; }
+            // Optional SPI pin overrides. Defaults match ccrome's original dev
+            // board (VSPI: SCK 18, MISO 19, MOSI 23). Other boards (e.g. LILYGO
+            // T-Embed CC1101: 11/10/9) can set these in YAML.
+            void set_spi_pins(uint8_t sck, uint8_t miso, uint8_t mosi) {
+                sck_pin_ = sck; miso_pin_ = miso; mosi_pin_ = mosi;
+            }
         };
 
     }  // namespace quiet_cool

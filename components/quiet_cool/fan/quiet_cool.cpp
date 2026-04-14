@@ -14,8 +14,9 @@ namespace esphome {
             }
 
             if (this->qc_ == nullptr) {
-                // Use standard VSPI pins (CLK18, MISO19, MOSI23) for ESP32 dev boards
-                this->qc_.reset(new QuietCool(this->csn_pin_, this->gdo0_pin_, this->gdo2_pin_, 18, 19, 23, remote_id_.data(), center_freq_mhz, deviation_khz));
+                // Default VSPI pins (SCK 18, MISO 19, MOSI 23) for ESP32 dev boards;
+                // overridable via set_spi_pins() for other boards (see YAML knobs).
+                this->qc_.reset(new QuietCool(this->csn_pin_, this->gdo0_pin_, this->gdo2_pin_, this->sck_pin_, this->miso_pin_, this->mosi_pin_, remote_id_.data(), center_freq_mhz, deviation_khz));
                 this->qc_->setPreambleByte(this->preamble_byte_);
                 if (this->fsctrl0_override_enabled_) this->qc_->setFsctrl0Override(this->fsctrl0_override_value_);
                 this->qc_->setVerifyAck(this->verify_ack_);

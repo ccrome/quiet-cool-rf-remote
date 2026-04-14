@@ -20,6 +20,9 @@ CONF_FSCTRL0_OVERRIDE = "fsctrl0_override"
 CONF_VERIFY_ACK = "verify_ack"
 CONF_ACK_TIMEOUT_MS = "ack_timeout_ms"
 CONF_MAX_SEND_ATTEMPTS = "max_send_attempts"
+CONF_SCK_PIN = "sck_pin"
+CONF_MISO_PIN = "miso_pin"
+CONF_MOSI_PIN = "mosi_pin"
 
 DEPENDENCIES = ["spi"]
 
@@ -53,6 +56,12 @@ CONFIG_SCHEMA = fan.fan_schema(QuietCoolFan).extend(
         cv.Optional(CONF_VERIFY_ACK, default=False   ): cv.boolean,
         cv.Optional(CONF_ACK_TIMEOUT_MS, default=800 ): cv.positive_int,
         cv.Optional(CONF_MAX_SEND_ATTEMPTS, default=5): cv.int_range(min=1, max=32),
+        # Optional SPI pin overrides. Defaults (18/19/23) match the ESP32 VSPI
+        # pins used on ccrome's original dev board. Set these for other boards,
+        # e.g. LILYGO T-Embed CC1101 uses sck_pin=11, miso_pin=10, mosi_pin=9.
+        cv.Optional(CONF_SCK_PIN, default=18 ): cv.uint8_t,
+        cv.Optional(CONF_MISO_PIN, default=19): cv.uint8_t,
+        cv.Optional(CONF_MOSI_PIN, default=23): cv.uint8_t,
     }
 ).extend(cv.COMPONENT_SCHEMA).extend(spi.spi_device_schema(cs_pin_required=True))
 
@@ -73,3 +82,4 @@ async def to_code(config):
     cg.add(var.set_verify_ack(config[CONF_VERIFY_ACK]))
     cg.add(var.set_ack_timeout_ms(config[CONF_ACK_TIMEOUT_MS]))
     cg.add(var.set_max_send_attempts(config[CONF_MAX_SEND_ATTEMPTS]))
+    cg.add(var.set_spi_pins(config[CONF_SCK_PIN], config[CONF_MISO_PIN], config[CONF_MOSI_PIN]))
