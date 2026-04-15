@@ -10,8 +10,7 @@ namespace quiet_cool {
 
 static const char *TAG = "quietcool";
 
-const uint8_t SYNC[] = {0x15, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa};
-#define SYNC_LEN (sizeof(SYNC))
+#define SYNC_LEN 9
 #define REMOTE_ID_LEN (sizeof(REMOTE_ID))
 
 #define CMD_CODE_LEN 2
@@ -81,7 +80,8 @@ void QuietCool::sendPacket(const uint8_t cmd_code) {
     const uint8_t padding_len = 2;
     uint8_t full_cmd[SYNC_LEN + 7 + CMD_CODE_LEN+padding_len];
     memset(full_cmd, 0, sizeof(full_cmd));
-    memcpy(full_cmd, SYNC, SYNC_LEN);
+    full_cmd[0] = 0x15;
+    for (size_t i = 1; i < SYNC_LEN; i++) full_cmd[i] = preamble_byte;
     memcpy(full_cmd + SYNC_LEN, remote_id, 7);
     memcpy(full_cmd + SYNC_LEN + 7, &cmd_code, 1);
     memcpy(full_cmd + SYNC_LEN + 8, &cmd_code, 1);
@@ -189,6 +189,17 @@ bool QuietCool::initCC1101() {
     ELECHOUSE_cc1101.setPacketLength(20);
     ELECHOUSE_cc1101.setPRE(0);
 
+    // FSCTRL0 override: ELECHOUSE's Calibrate() (called from setMHZ) writes a
+    // frequency-mapped value into FSCTRL0, adding a synth offset to the TX
+    // center. Undo it here if the user requested an override.
+    if (fsctrl0_override_enabled) {
+        ELECHOUSE_cc1101.SpiStrobe(0x36);  // SIDLE
+        delayMicroseconds(100);
+        ELECHOUSE_cc1101.SpiWriteReg(0x0C, fsctrl0_override_value);  // FSCTRL0
+        ELECHOUSE_cc1101.SpiStrobe(0x33);  // SCAL
+        delay(2);
+    }
+
     delay(500);
     return true;
 }
@@ -205,11 +216,100 @@ void QuietCool::begin() {
     ESP_LOGI(TAG, "CC1101 ready");
 }
 
+// Search for `pattern` (pattern_bits bits, MSB-first per byte) inside the bit
+// stream of `buf` (nbytes long, also MSB-first per byte). Returns true if the
+// pattern appears at any bit offset. Used to locate the remote ID inside the
+// hub's ACK, which may land at any bit alignment depending on where the sync
+// detector happened to lock.
+static bool contains_bit_pattern(const uint8_t *buf, size_t nbytes,
+                                 const uint8_t *pattern, size_t pattern_bits) {
+    if (pattern_bits == 0) return false;
+    size_t total_bits = nbytes * 8;
+    if (pattern_bits > total_bits) return false;
+    for (size_t start = 0; start + pattern_bits <= total_bits; start++) {
+        bool match = true;
+        for (size_t i = 0; i < pattern_bits; i++) {
+            size_t bb = start + i;
+            size_t pb = i;
+            uint8_t b_bit = (buf[bb / 8] >> (7 - (bb % 8))) & 1;
+            uint8_t p_bit = (pattern[pb / 8] >> (7 - (pb % 8))) & 1;
+            if (b_bit != p_bit) { match = false; break; }
+        }
+        if (match) return true;
+    }
+    return false;
+}
+
+bool QuietCool::awaitAck(uint32_t timeout_ms) {
+    // Put the chip into RX mode listening for a preamble-style sync. The ACK
+    // packet uses the same preamble/ID structure as the remote's TX, so we
+    // watch for any 16-bit window matching the alternating preamble, then
+    // capture subsequent bytes into the FIFO.
+    ELECHOUSE_cc1101.SpiStrobe(0x36);  // SIDLE
+    ELECHOUSE_cc1101.SpiStrobe(0x3A);  // SFRX (flush RX FIFO)
+    delayMicroseconds(100);
+    ELECHOUSE_cc1101.SpiWriteReg(0x04, 0xAA);  // SYNC1
+    ELECHOUSE_cc1101.SpiWriteReg(0x05, 0xAA);  // SYNC0
+    ELECHOUSE_cc1101.setSyncMode(1);           // 15/16 bits match
+    ELECHOUSE_cc1101.setLengthConfig(2);       // infinite packet length
+    ELECHOUSE_cc1101.setRxBW(58.0);            // wide enough for 9.6 kHz dev + 2.4 kbaud
+    ELECHOUSE_cc1101.SpiStrobe(0x34);          // SRX
+
+    uint8_t buf[128];
+    size_t total = 0;
+    bool got_ack = false;
+
+    unsigned long deadline = millis() + timeout_ms;
+    while (millis() < deadline && total < sizeof(buf)) {
+        uint8_t rxbytes = ELECHOUSE_cc1101.SpiReadStatus(0x3B) & 0x7F;
+        if (rxbytes > 0) {
+            size_t to_read = rxbytes;
+            if (total + to_read > sizeof(buf)) to_read = sizeof(buf) - total;
+            ELECHOUSE_cc1101.SpiReadBurstReg(0x3F, &buf[total], to_read);
+            total += to_read;
+            if (contains_bit_pattern(buf, total, remote_id, 7 * 8)) {
+                got_ack = true;
+                break;
+            }
+        } else {
+            delay(2);
+        }
+    }
+
+    // Restore config for the next TX.
+    ELECHOUSE_cc1101.SpiStrobe(0x36);
+    ELECHOUSE_cc1101.SpiStrobe(0x3A);
+    ELECHOUSE_cc1101.setLengthConfig(0);
+    ELECHOUSE_cc1101.setSyncMode(0);
+
+    if (got_ack) {
+        ESP_LOGI(TAG, "awaitAck: got ACK (%zu bytes captured)", total);
+    } else {
+        ESP_LOGW(TAG, "awaitAck: no ACK in %u ms (%zu bytes captured)",
+                 (unsigned)timeout_ms, total);
+    }
+    return got_ack;
+}
+
 void QuietCool::send(QuietCoolSpeed speed, QuietCoolDuration duration) {
-    ESP_LOGI(TAG, "send(0x%02x, %0x%02x)", speed, duration);
+    ESP_LOGI(TAG, "send(0x%02x, 0x%02x)", speed, duration);
     const uint8_t cmd_code = getCommand(speed, duration);
-    ESP_LOGI(TAG, "cmd=%02x ", cmd_code);
-    sendPacket(cmd_code);
+    ESP_LOGI(TAG, "cmd=%02x", cmd_code);
+
+    if (!verify_ack) {
+        sendPacket(cmd_code);
+        return;
+    }
+
+    for (uint8_t attempt = 1; attempt <= max_send_attempts; attempt++) {
+        sendPacket(cmd_code);
+        if (awaitAck(ack_timeout_ms)) {
+            ESP_LOGI(TAG, "send OK on attempt %u/%u", attempt, max_send_attempts);
+            return;
+        }
+        ESP_LOGW(TAG, "send attempt %u/%u: no ACK, retrying", attempt, max_send_attempts);
+    }
+    ESP_LOGE(TAG, "send FAILED: no ACK after %u attempts", max_send_attempts);
 }
 
 }  // namespace quiet_cool

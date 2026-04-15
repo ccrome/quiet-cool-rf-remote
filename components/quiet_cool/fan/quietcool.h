@@ -49,8 +49,15 @@ class QuietCool {
     uint8_t remote_id[7];
     float   center_freq_mhz;
     float   deviation_khz;
+    uint8_t  preamble_byte{0xAA};
+    bool     fsctrl0_override_enabled{false};
+    uint8_t  fsctrl0_override_value{0};
+    bool     verify_ack{false};
+    uint32_t ack_timeout_ms{800};
+    uint8_t  max_send_attempts{5};
 
     bool initCC1101();
+    bool awaitAck(uint32_t timeout_ms);
     uint8_t readChipVersion();
     void processBitsFromBytes(const uint8_t* bytes, size_t byte_len, bool send_to_pin);
     void sendRawData(const uint8_t* data, size_t len);
@@ -63,6 +70,30 @@ class QuietCool {
     QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi, const uint8_t* remote_id_in, float freq_mhz, float deviation_khz);
     void begin();
     void send(QuietCoolSpeed speed, QuietCoolDuration duration);
+
+    // The preamble byte following the leading 0x15. Default 0xAA matches the
+    // original reverse-engineered protocol; some hubs (e.g. Stealth Pro 7.0 with
+    // the latest firmware) reject this and require 0x55 instead. 0x15 0xAA has
+    // a `1,1` bit at the byte boundary that breaks strict bit-sync decoders;
+    // 0x55 gives a purely alternating bit stream.
+    void setPreambleByte(uint8_t b) { preamble_byte = b; }
+
+    // Override FSCTRL0 (frequency-synthesizer offset, register 0x0C) after
+    // setMHZ(). ELECHOUSE's Calibrate() writes a frequency-mapped value here
+    // (at 433 MHz that's ~35, ~+55 kHz offset). The register is 8-bit two's
+    // complement; each unit is f_XOSC/2^14 ≈ 1.587 kHz. Pass 0 to cancel the
+    // library's offset; pass other values to dial in per-unit crystal drift.
+    void setFsctrl0Override(uint8_t v) { fsctrl0_override_enabled = true; fsctrl0_override_value = v; }
+
+    // Bidirectional protocol: when enabled, after each transmit the radio
+    // switches to RX and listens for the hub's ACK packet (verified to exist
+    // via SDR analysis — same 2-FSK / 433.92 MHz / preamble+ID structure as
+    // the remote's TX, arriving ~250 ms later in groups of 3). If no ACK is
+    // detected within `timeout_ms` the packet is retransmitted, up to `max`
+    // attempts total. Matches the real remote's out-of-range error behavior.
+    void setVerifyAck(bool v) { verify_ack = v; }
+    void setAckTimeoutMs(uint32_t v) { ack_timeout_ms = v; }
+    void setMaxSendAttempts(uint8_t v) { max_send_attempts = v; }
 };
 
 }  // namespace quiet_cool
