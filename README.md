@@ -5,11 +5,10 @@ Operate your remote controlled QuietCool Fan from ESPHome or Arduino.
 This project implements an RF remote control system for Quiet Cool fans using an ESP32 microcontroller and CC1101 RF module.
 The system can control various fan speeds and modes through RF signals.
 
-## WARNING WARNING WARNING
-**This should have been obvious to me before.  Alas, it wasn't.  Each RF remote has a unique ID built-in, and this code literally
-only works with my remote for that reason.  Currently, getting this working will take some effort decoding your individual remote. 
-Lame, I know.  Whatcha gonna do?
-**
+Each RF remote has a unique 7-byte ID built in — but you **don't need to
+decode yours**: on first boot the device enters pairing mode and learns the
+ID from any button press on your physical remote (see
+[Pairing](#pairing-recommended)).
 
 
 ![QuietCool Remote](images/quietcool_fan.png)
@@ -55,22 +54,32 @@ spi:
 external_components:
   - source:
       type: git
-      url: https://github.com/ccrome/quiet-cool-rf-remote.git
+      url: https://github.com/adamrb/quiet-cool-rf-remote.git
       ref: main
     components: [ quiet_cool ]
 
 fan:
   - platform: quiet_cool
+    id: quietcool_fan_id
     name: QuietCool fan
     cs_pin: 15
     gdo0_pin: 13
     gdo2_pin: 12
-    remote_id: [0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2]
 # optional variables
+#    remote_id: [0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2]
 #    center_freq_mhz: 433.897
 #    deviation_khz: 10
+
+button:
+  - platform: template
+    name: "Pair Remote"
+    on_press:
+      - lambda: id(quietcool_fan_id).start_pairing();
 ```
 * click `INSTALL` and install it in the normal ESPHome ways...
+* on first boot with no `remote_id`, the device enters **pairing mode** for 60
+  seconds — press any button on your QuietCool remote nearby and its ID is
+  learned and saved to flash. Done.
 
 ## TL;DR -- get it running on ESPHome, building locally
 
@@ -78,8 +87,9 @@ Create a `secrets.yaml` file
 ```yaml
 wifi_ssid: <ssid>
 wifi_password: <wifi password>
-api_enctryption_key: <api key>
+api_encryption_key: <api key>
 ota_password: <ota password>
+ap_password: <fallback hotspot password>
 ```
 
 
@@ -92,47 +102,59 @@ esphome logs --device /dev/ttyUSB0 quietcool-fan-example.yaml
 
 If everything is working, you should see
 ```
-[16:48:24][D][quietcool:168]: gdo0_pin = 13, gdo2_pin = 12
-[16:48:24][I][quietcool:174]: Starting CC1101 setup
-[16:48:24][D][quietcool:041]: sck:18, miso:19, mosi:23, csn:15
-[16:48:24][I][quietcool:047]: CC1101 VERSION READ: 0x00
-[16:48:24][I][quietcool:047]: CC1101 VERSION READ: 0x14
-[16:48:24][I][quietcool:049]: CC1101 detected!
-[16:48:24][I][quietcool:179]: CC1101 ready
-[16:48:24][D][empty_fan.fan:022]: QuietCool initialized
+[I][quietcool.cc1101]: CC1101 detected (VERSION=0x14)
+[I][quietcool.radio]: Radio task started
+[C][quiet_cool.fan]:   Paired Remotes: 1
+[C][quiet_cool.fan]:     [0] 2D.D4.06.CB.03.E6.45 (7)
+[D][quiet_cool.fan]: Radio: MARCSTATE=0x0D pkts=12 dropped=0 overflows=0 tx_fail=0
 ```
+`MARCSTATE=0x0D` means the radio is listening; the `Radio:` diagnostics line
+repeats every 10 seconds. With no remote configured or paired you'll instead
+see the pairing prompt — press any button on your remote within 60 seconds.
 
 # Configuration
 
-## Required Configuration
+## Pairing (recommended)
 
-The `remote_id` field is **required** and must match your specific QuietCool remote. This is a 7-byte identifier that uniquely identifies your remote control.
+You no longer need to sniff your remote's ID with an SDR. Leave `remote_id`
+out of the YAML and the device enters **pairing mode** on first boot: for 60
+seconds it accepts any valid QuietCool packet and stores the sender's ID in
+flash. Press any button on your physical remote while near the ESP32 and
+you're paired.
 
-> **Note:** QuietCool fans can pair with multiple remotes. This means you may not need to decode your existing remote's ID. Instead, you can simply pair this new ESPHome-based remote (with its own `remote_id`) to your fan, and both your original remote and the Home Assistant remote should work together.  This has yet to be tested.
+To pair later (or pair additional remotes, up to 4), expose a button:
 
+```yaml
+button:
+  - platform: template
+    name: "Pair Remote"
+    on_press:
+      - lambda: id(quietcool_fan_id).start_pairing();
+```
 
-### Finding Your Remote ID
+Paired IDs survive reboots. `id(quietcool_fan_id).clear_paired_remotes()`
+forgets them all.
 
-NOTE:  you may not need to decode your existing remote's ID.  Instead, you can simply pair this new ESPHome-based remote (with its own `remote_id`) to your fan, and both your original remote and the Home Assistant remote should work together.  This has yet to be tested.
+### Setting the ID manually
 
-To find your remote ID, you can:
-1. Use an RTL-SDR to capture signals from your physical remote
-2. Analyze the captured signals to extract the remote ID
-3. Or use the default value as a starting point: `[0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2]`
+If you already know your remote's 7-byte ID (e.g. from an RTL-SDR capture),
+set `remote_id:` in YAML — it is stored as the primary (TX) identity.
 
 ### Example Configuration
 
 ```yaml
 fan:
   - platform: quiet_cool
+    id: quietcool_fan_id
     name: QuietCool fan
     cs_pin: 15
     gdo0_pin: 13
     gdo2_pin: 12
-    remote_id: [0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2]
     # Optional:
+    # remote_id: [0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2]
     # center_freq_mhz: 433.897
     # deviation_khz: 10
+    # speed_count: 3
 ```
 
 ---
@@ -144,11 +166,12 @@ fan:
 | `name`            | Yes      | string       |           | The name of the fan in Home Assistant.                                      |
 | `platform`        | Yes      | string       |           | Must be `quiet_cool`.                                                       |
 | `cs_pin`          | Yes      | int          |           | SPI chip select pin for CC1101.                                             |
-| `gdo0_pin`        | Yes      | int          |           | GDO0 pin from CC1101 (used for TX status).                                  |
-| `gdo2_pin`        | Yes      | int          |           | GDO2 pin from CC1101 (can be -1 if unused).                                 |
-| `remote_id`       | Yes      | list[hex]    |           | 7-byte unique ID for your remote (see above).                               |
+| `gdo0_pin`        | Yes      | int          |           | GDO0 pin from CC1101 (packet RX interrupt + TX status).                     |
+| `gdo2_pin`        | Yes      | int          |           | GDO2 pin from CC1101 (wired but currently unused).                          |
+| `remote_id`       | No       | list[hex]    |           | 7-byte remote ID. Omit to use pairing mode instead (see above).             |
 | `center_freq_mhz` | No       | float        | 433.897    | Center frequency in MHz for RF transmission.                                |
 | `deviation_khz`   | No       | float        | 10         | Frequency deviation (spread) in kHz for FSK modulation.                     |
+| `speed_count`     | No       | int          | 3          | Number of fan speeds: 2 (LOW/HIGH) or 3 (LOW/MEDIUM/HIGH).                 |
 
 **Note:** You must also define the SPI bus pins in your YAML:
 
@@ -159,22 +182,44 @@ spi:
   miso_pin: 19
 ```
 
-## Recent Improvements
+## Architecture
 
-### Transmission System Overhaul
-- **Consolidated bit conversion logic**: Unified logging and transmission to ensure consistency
-- **Improved reliability**: Fixed potential timing and synchronization issues
-- **Better debugging**: Enhanced logging with bit-level visibility
-- **Configurable remote ID**: Support for custom remote identifiers via YAML configuration
+The component runs all radio I/O in a **dedicated FreeRTOS task** so packet
+reception never competes with WiFi, the Home Assistant API, or a Bluetooth
+proxy for main-loop time:
 
-### Technical Changes
-- Replaced string-based command system with byte arrays for better performance
-- Consolidated `logBits` and `sendBitsFromBytes` functions to use shared logic
-- Added configurable `remote_id` parameter throughout the stack
-- Improved error handling and validation
+- **Interrupt-driven RX**: the CC1101's GDO0 line raises an interrupt at each
+  packet end; the radio task drains the FIFO within microseconds, decodes the
+  packet, and hands the result to ESPHome through a queue. Remote button
+  presses are captured even while the main loop is stalled.
+- **Queued, non-blocking TX**: commands from Home Assistant are queued to the
+  radio task; the ESPHome loop never waits on the radio. GDO0 waits are
+  bounded, so a wiring fault logs an error instead of rebooting the device.
+- **Bidirectional state sync**: commands from the physical remote (and the
+  fan's own responses) update Home Assistant state, with 1-second
+  deduplication of the remote's burst repeats.
+- **WAKE polling**: the radio task queries the fan's state every 30 seconds,
+  and ~2 seconds after every transmitted command — so if the fan didn't hear
+  a command, Home Assistant corrects itself instead of lying.
+- **Pairing**: remote IDs are learned over the air and persisted to flash.
+- **Pure protocol core**: packet encode/decode lives in `protocol.{h,cpp}`
+  with no hardware dependencies, covered by host-side unit tests (`tests/`).
 
-# Run it on arduino
-The arduino code doesn't do much by itself.  But it gets you going:
+## Unit tests
+
+```
+make -C tests run
+```
+
+Builds with plain `g++` (Catch2 vendored) and covers packet round-trips,
+golden packets from the original RF captures, corruption rejection, pairing
+ID extraction, speed mapping, and CC1101 register math. They run in CI on
+every push.
+
+# Run it on arduino (legacy)
+The `arduino/` directory is the original proof-of-concept and is **not
+maintained**; it predates the ESPHome component and uses a different
+(bit-banged) TX approach. The arduino code doesn't do much by itself.  But it gets you going:
 
 ```
 cd arduino
@@ -211,7 +256,7 @@ The source is here [in OnShape](https://cad.onshape.com/documents/23ba2be84b2f4d
 
 ## Software Requirements
 
-- PlatformIO
+- ESPHome (or PlatformIO for the legacy arduino demo)
 
 
 ## Features
@@ -231,6 +276,7 @@ The source is here [in OnShape](https://cad.onshape.com/documents/23ba2be84b2f4d
     - off
     - on
 - **Configurable remote ID** for compatibility with different remotes
+- **Bidirectional state sync** — physical remote commands and WAKE polling keep Home Assistant in sync with the fan
 
 # Reverse Engineering
 I used an RTL-SDR.COM SDR like this:
@@ -250,13 +296,14 @@ And for software, I used Universal Radio Haacker.  Here's a recording of all the
 This remote uses FSK modulation at 433.92MHz.  The CC1101 RF module ended up transmitting high, so I reduced the frequency in the code to 433.897 to make it work.  If things don't work, check the actual frequency.
 
 
-## Configuration
+## CC1101 Configuration
 
-The system operates at 433.897 MHz and uses FSK modulation. The CC1101 module is configured for:
-- Direct mode transmission
-- No packet handling
-- Raw data mode
-- No CRC or preamble
+The system operates at 433.897 MHz and uses 2-FSK modulation. The CC1101 module is configured for:
+- Fixed-length packet mode (20 bytes)
+- Hardware sync word detection (0x15AA)
+- Hardware preamble insertion (TX) and sync stripping (RX)
+- APPEND_STATUS enabled (RSSI + LQI appended to RX packets)
+- 10 dBm TX power
 
 ## Building and Uploading
 

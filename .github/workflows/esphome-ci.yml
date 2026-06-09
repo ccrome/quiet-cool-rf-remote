@@ -1,17 +1,29 @@
 name: ESPHome CI
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - '**.yaml'
       - 'components/**'
+      - 'tests/**'
       - '.github/workflows/esphome-ci.yml'
   pull_request:
     paths:
       - '**.yaml'
       - 'components/**'
+      - 'tests/**'
 
 jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run host unit tests
+        run: make -C tests run
+
   compile:
     runs-on: ubuntu-latest
     steps:
@@ -38,12 +50,13 @@ jobs:
           cat <<EOF > secrets.yaml
           wifi_ssid: dummy_ssid
           wifi_password: dummy_password
-          api_enctryption_key: 1HUvrwkoGd889qBYWEjK7QtFbfIAE89r4p68rMxnc+U=
+          api_encryption_key: 1HUvrwkoGd889qBYWEjK7QtFbfIAE89r4p68rMxnc+U=
           ota_password: dummy_ota_password
+          ap_password: dummy_ap_password
           EOF
           esphome compile quietcool-fan-example.yaml
 
-      - name: Compile quietcool example
+      - name: Build arduino legacy demo
         run: |
           cd arduino
           pio run

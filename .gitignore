@@ -4,3 +4,7 @@ __pycache__
 secrets.yaml
 .esphome
 nohup.out
+venv/
+tests/build/
+whole-house-fan.yaml
+whf-build.yaml

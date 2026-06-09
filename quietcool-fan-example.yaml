@@ -1,6 +1,6 @@
 esphome:
-  name: quietcool-junk
-  friendly_name: QuietCoolFan-junk
+  name: quietcool-fan
+  friendly_name: QuietCool Fan
 
 esp32:
   board: esp32dev
@@ -13,7 +13,7 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: !secret api_enctryption_key
+    key: !secret api_encryption_key
 
 ota:
   - platform: esphome
@@ -26,7 +26,7 @@ wifi:
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Quietcool Fallback Hotspot"
-    password: "iifozSf0C018"
+    password: !secret ap_password
 
 captive_portal:
 
@@ -44,8 +44,23 @@ external_components:
 
 fan:
   - platform: quiet_cool
+    id: quietcool_fan_id
     name: QuietCool fan
     cs_pin: 15
     gdo0_pin: 13
     gdo2_pin: 12
-    remote_id: [0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2]
+    # Optional: omit remote_id and use the Pair Remote button instead
+    # remote_id: [0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2]
+    # center_freq_mhz: 433.897
+    # deviation_khz: 10
+    # speed_count: 3  # 2 for LOW/HIGH fans, 3 for LOW/MEDIUM/HIGH
+
+button:
+  - platform: template
+    name: "Pair Remote"
+    on_press:
+      - lambda: id(quietcool_fan_id).start_pairing();
+  - platform: template
+    name: "Query Fan State"
+    on_press:
+      - lambda: id(quietcool_fan_id).send_wake();
