@@ -288,6 +288,21 @@ The system operates at 433.897 MHz and uses FSK modulation. The CC1101 module is
 # TODO
 * Implement the timers in the esphome UI
 
+## Second radio: VEVOR weather station receiver (this fork)
+
+This controller also carries a **second CC1101, an 868/915 MHz module**, that receives a VEVOR
+7-in-1 weather station's outdoor array (wind, gust, direction, rain gauge, temperature, humidity,
+UV, light). It shares the fan radio's SPI lines (CLK 18 / MOSI 23 / MISO 19), with **CS on
+GPIO27 and GDO0 on GPIO26**.
+
+The fan's 433 MHz CC1101 and the `quiet_cool` component are unchanged. Both drivers begin and end
+the SPI bus around every access and only use it from `loop()`, so they don't collide.
+
+The receiver component (`vevor_7in1`) and its YAML live in
+[rain_sensor_with_solar_battery](https://github.com/CurlySmoke/rain_sensor_with_solar_battery)
+(`components/vevor_7in1/`, README "Wind and rain gauge"). That repo is private, so the component
+is copied into HA's `esphome/components/` and referenced as a local component.
+
 ## License
 MIT License
 
