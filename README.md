@@ -15,7 +15,7 @@ Lame, I know.  Whatcha gonna do?
 ![QuietCool Remote](images/quietcool_fan.png)
 
 # TL;DR -- get it running on ESPHome
-Get a generateic CC1101 board.  Like this [CC1101 Board](https://www.amazon.com/dp/B0D3W9GVRQ?ref=ppx_yo2ov_dt_b_fed_asin_title)
+Get a generic CC1101 board.  Like this [CC1101 Board](https://www.amazon.com/dp/B0D3W9GVRQ?ref=ppx_yo2ov_dt_b_fed_asin_title)
 
 ![CC1101](images/41x16EagV+L._SL1000_.jpg)
 
@@ -131,6 +131,7 @@ fan:
     gdo2_pin: 12
     remote_id: [0x2D, 0xD4, 0x06, 0xCB, 0x00, 0xF7, 0xF2]
     # Optional:
+    # speed_count: 2
     # center_freq_mhz: 433.897
     # deviation_khz: 10
 ```
@@ -144,9 +145,10 @@ fan:
 | `name`            | Yes      | string       |           | The name of the fan in Home Assistant.                                      |
 | `platform`        | Yes      | string       |           | Must be `quiet_cool`.                                                       |
 | `cs_pin`          | Yes      | int          |           | SPI chip select pin for CC1101.                                             |
-| `gdo0_pin`        | Yes      | int          |           | GDO0 pin from CC1101 (used for TX status).                                  |
+| `gdo0_pin`        | Yes      | int          |           | GDO0 pin from CC1101 (used for TX/RX packet-complete signaling).             |
 | `gdo2_pin`        | Yes      | int          |           | GDO2 pin from CC1101 (can be -1 if unused).                                 |
 | `remote_id`       | Yes      | list[hex]    |           | 7-byte unique ID for your remote (see above).                               |
+| `speed_count`     | No       | int (2 or 3) | 3         | Set to `2` for LOW/HIGH fans, or `3` for LOW/MEDIUM/HIGH fans.               |
 | `center_freq_mhz` | No       | float        | 433.897    | Center frequency in MHz for RF transmission.                                |
 | `deviation_khz`   | No       | float        | 10         | Frequency deviation (spread) in kHz for FSK modulation.                     |
 
@@ -158,6 +160,27 @@ spi:
   mosi_pin: 23
   miso_pin: 19
 ```
+
+## Physical Remote State Tracking
+
+The component listens for the configured `remote_id` whenever it is not
+transmitting. A valid physical-remote command updates the ESPHome/Home
+Assistant fan power and speed state. The three repeated RF frames sent for a
+single button press are deduplicated automatically.
+
+Timed commands (1, 2, 4, 8, or 12 hours) also start a local countdown so the
+published state changes to off when the requested duration elapses. An `ON`
+or `OFF` command cancels that countdown.
+
+This is command tracking rather than feedback from the fan itself: the fan
+does not transmit an acknowledgement or current status. A missed RF command,
+a command from a different remote ID, or a fan power interruption can
+therefore leave the published state out of sync until the next matching
+command is received.
+
+For a two-speed fan, set `speed_count: 2`. ESPHome/Home Assistant will then
+expose two speeds, map speed 1 to the LOW RF command, and map speed 2 to HIGH.
+The default value of `3` retains the LOW/MEDIUM/HIGH behavior.
 
 ## Recent Improvements
 
@@ -236,7 +259,7 @@ The source is here [in OnShape](https://cad.onshape.com/documents/23ba2be84b2f4d
 I used an RTL-SDR.COM SDR like this:
 ![RTL-SDR v3](images/rtl-sdrv3-500.jpg)
 
-And for software, I used Universal Radio Haacker.  Here's a recording of all the signals as they progress from H 1 2 4 8 12 ON OFF -> to medium -> low.  It was recorded with these settings
+And for software, I used Universal Radio Hacker.  Here's a recording of all the signals as they progress from H 1 2 4 8 12 ON OFF -> to medium -> low.  It was recorded with these settings
 
 ![Settings](images/record-settings.png)
 
@@ -264,6 +287,21 @@ The system operates at 433.897 MHz and uses FSK modulation. The CC1101 module is
 
 # TODO
 * Implement the timers in the esphome UI
+
+## Second radio: VEVOR weather station receiver (this fork)
+
+This controller also carries a **second CC1101, an 868/915 MHz module**, that receives a VEVOR
+7-in-1 weather station's outdoor array (wind, gust, direction, rain gauge, temperature, humidity,
+UV, light). It shares the fan radio's SPI lines (CLK 18 / MOSI 23 / MISO 19), with **CS on
+GPIO27 and GDO0 on GPIO26**.
+
+The fan's 433 MHz CC1101 and the `quiet_cool` component are unchanged. Both drivers begin and end
+the SPI bus around every access and only use it from `loop()`, so they don't collide.
+
+The receiver component (`vevor_7in1`) and its YAML live in
+[rain_sensor_with_solar_battery](https://github.com/CurlySmoke/rain_sensor_with_solar_battery)
+(`components/vevor_7in1/`, README "Wind and rain gauge"). That repo is private, so the component
+is copied into HA's `esphome/components/` and referenced as a local component.
 
 ## License
 MIT License

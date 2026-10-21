@@ -36,9 +36,20 @@ enum QuietCoolDuration {
     QUIETCOOL_DURATION_LAST
 };
 
+struct QuietCoolCommand {
+    QuietCoolSpeed speed;
+    QuietCoolDuration duration;
+    uint8_t code;
+    int8_t rssi_dbm;
+    uint8_t lqi;
+};
+
 class QuietCool {
   private:
-    static constexpr uint8_t TO_BIT(char c) { return (c == '1') ? 1 : 0; }
+    static constexpr size_t REMOTE_ID_LEN = 7;
+    static constexpr size_t RX_PAYLOAD_LEN = REMOTE_ID_LEN - 2 + 2;
+    static constexpr size_t RX_STATUS_LEN = 2;
+    static constexpr uint32_t RX_DEDUP_WINDOW_MS = 350;
 
     uint8_t csn_pin;
     uint8_t gdo0_pin;
@@ -49,20 +60,33 @@ class QuietCool {
     uint8_t remote_id[7];
     float   center_freq_mhz;
     float   deviation_khz;
+    bool initialized_{false};
+    volatile bool listening_{false};
+    volatile bool packet_ready_{false};
+    uint8_t last_rx_code_{0};
+    uint32_t last_rx_at_{0};
+
+    static QuietCool *active_receiver_;
+    static void handleGdo0Interrupt();
 
     bool initCC1101();
     uint8_t readChipVersion();
-    void processBitsFromBytes(const uint8_t* bytes, size_t byte_len, bool send_to_pin);
     void sendRawData(const uint8_t* data, size_t len);
     void sendPacket(const uint8_t cmd_code);
     const uint8_t getCommand(QuietCoolSpeed speed, QuietCoolDuration duration);
     void logBits(const uint8_t* data, size_t len);
-    // REMOTE_ID is now the name for the unique remote identifier
+    void configureTransmit();
+    void configureReceive();
+    void startListening();
+    void restartReceiver();
+    bool decodePayload(const uint8_t *payload, QuietCoolCommand &command) const;
+    static int8_t decodeRssi(uint8_t raw_rssi);
 
   public:
     QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi, const uint8_t* remote_id_in, float freq_mhz, float deviation_khz);
     void begin();
     void send(QuietCoolSpeed speed, QuietCoolDuration duration);
+    bool receive(QuietCoolCommand &command);
 };
 
 }  // namespace quiet_cool
